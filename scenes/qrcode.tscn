@@ -1,0 +1,79 @@
+[gd_scene format=3 uid="uid://cqvo2vkjgr2xx"]
+
+[ext_resource type="Script" uid="uid://dhoea37l05l40" path="res://scripts/qrcode.gd" id="1_gpbkt"]
+[ext_resource type="Shader" uid="uid://dns1acbcl5haa" path="res://resources/qrcode.gdshader" id="2_ix88b"]
+[ext_resource type="Script" uid="uid://iws2m5f75rfc" path="res://addons/NativeCameraPlugin/NativeCamera.gd" id="2_sihoj"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_qnk50"]
+shader = ExtResource("2_ix88b")
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_qnk50"]
+bg_color = Color(0.6, 0.6, 0.6, 0)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(1, 1, 1, 1)
+
+[node name="QRCode" type="Control" unique_id=1616750411]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_gpbkt")
+
+[node name="Background" type="ColorRect" parent="." unique_id=917195972]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.1882353, 0.1882353, 0.1882353, 1)
+
+[node name="CameraPreview" type="TextureRect" parent="." unique_id=496803582]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+stretch_mode = 6
+
+[node name="Mask" type="ColorRect" parent="." unique_id=2106356911]
+material = SubResource("ShaderMaterial_qnk50")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.5882353)
+
+[node name="ScanFrame" type="AspectRatioContainer" parent="." unique_id=1108132063]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.125
+anchor_top = 0.125
+anchor_right = 0.875
+anchor_bottom = 0.875
+
+[node name="FrameBorder" type="Panel" parent="ScanFrame" unique_id=1153535553]
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_qnk50")
+
+[node name="StatusLabel" type="Label" parent="ScanFrame/FrameBorder" unique_id=369675825]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 60
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="NativeCamera" type="Node" parent="." unique_id=293128046]
+script = ExtResource("2_sihoj")

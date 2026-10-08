@@ -1,0 +1,25 @@
+;
+; © 2026-present https://github.com/cengiz-pz
+;
+
+[config]
+name="NativeCameraPlugin"
+binary="NativeCameraPlugin.xcframework"
+
+initialization="native_camera_plugin_init"
+deinitialization="native_camera_plugin_deinit"
+
+use_swift_runtime=true
+
+[dependencies]
+linked=[]
+embedded=[]
+system=[]
+
+capabilities=[]
+
+files=[]
+
+linker_flags=[]
+
+[plist]

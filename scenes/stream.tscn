@@ -1,0 +1,39 @@
+[gd_scene format=3 uid="uid://lo57idjw0fih"]
+
+[ext_resource type="Script" uid="uid://cvxndgbk07i4t" path="res://scripts/stream.gd" id="1_kftws"]
+
+[node name="Stream" type="Control" unique_id=1261490250]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_kftws")
+
+[node name="Background" type="ColorRect" parent="." unique_id=1178492198]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.1882353, 0.1882353, 0.1882353, 1)
+
+[node name="StreamWindow" type="TextureRect" parent="." unique_id=2047664680]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+stretch_mode = 5
+
+[node name="TouchLayer" type="Control" parent="." unique_id=625918011]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
