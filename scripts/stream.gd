@@ -3,15 +3,11 @@ extends Control
 signal connection_succeeded
 signal connection_failed
 
-var server_url := ""
-var waiting_for_initial_connection := false
-var initial_connection_timer := 0.0
-const INITIAL_CONNECTION_TIMEOUT := 2.0
 const MAX_VIDEO_FPS := 60.0
 
 @onready var video: TextureRect = $StreamWindow
+@onready var connection: Node = get_node("../Connection")
 
-var socket := WebSocketPeer.new()
 var texture: ImageTexture
 var latest_jpeg := PackedByteArray()
 
@@ -25,7 +21,6 @@ var decoded_image: Image
 var decoded_ready := false
 
 var video_timer := 0.0
-var reconnect_timer := 0.0
 
 var received_frames := 0
 var decoded_frames := 0
@@ -33,6 +28,10 @@ var displayed_frames := 0
 
 
 func _ready() -> void:
+	connection.binary_message_received.connect(_on_binary_message_received)
+	connection.connection_succeeded.connect(_on_connection_succeeded)
+	connection.connection_failed.connect(_on_connection_failed)
+
 	_start_decode_thread()
 
 
@@ -40,74 +39,31 @@ func _exit_tree() -> void:
 	_stop_decode_thread()
 
 
-func _process(delta: float) -> void:
-	socket.poll()
-	
-	if waiting_for_initial_connection:
-		initial_connection_timer -= delta
-
-		if initial_connection_timer <= 0.0:
-			waiting_for_initial_connection = false
-			socket.close()
-			print("[Godot] Initial connection timeout")
-			connection_failed.emit()
-			return
-
-	match socket.get_ready_state():
-		WebSocketPeer.STATE_OPEN:
-			reconnect_timer = 0.0
-
-			if waiting_for_initial_connection:
-				waiting_for_initial_connection = false
-				print("[Godot] Stream connection succeeded")
-				connection_succeeded.emit()
-
-			_receive_latest_packet()
-			_process_video(delta)
-
-		WebSocketPeer.STATE_CLOSED:
-			if waiting_for_initial_connection:
-				waiting_for_initial_connection = false
-				print("[Godot] Stream connection failed")
-				connection_failed.emit()
-			else:
-				_handle_closed(delta)
-
-
 func set_server_url(url: String) -> void:
-	server_url = url.replace("http://", "ws://").replace("https://", "wss://")
-
-	if not server_url.ends_with("/"):
-		server_url += "/"
-
-	print("[Godot] Server URL: ", server_url)
-
-	socket = WebSocketPeer.new()
-	reconnect_timer = 0.0
-	waiting_for_initial_connection = true
-	initial_connection_timer = INITIAL_CONNECTION_TIMEOUT
-
-	_connect_server()
+	connection.set_server_url(url)
 
 
-func _connect_server() -> void:
-	if server_url.is_empty():
+func _on_connection_succeeded() -> void:
+	connection_succeeded.emit()
+
+
+func _on_connection_failed() -> void:
+	connection_failed.emit()
+
+
+func _on_binary_message_received(data: PackedByteArray) -> void:
+	if data.is_empty():
 		return
 
-	print("[Godot] Connecting to: ", server_url)
-	var error := socket.connect_to_url(server_url)
-	if error != OK:
-		print("[Godot] connect_to_url() failed: ", error)
-		reconnect_timer = 3.0
+	decode_mutex.lock()
+	latest_jpeg = data
+	decode_mutex.unlock()
+
+	received_frames += 1
 
 
-func _receive_latest_packet() -> void:
-	while socket.get_available_packet_count() > 0:
-		var packet := socket.get_packet()
-		if socket.was_string_packet():
-			continue
-		latest_jpeg = packet
-		received_frames += 1
+func _process(delta: float) -> void:
+	_process_video(delta)
 
 
 func _process_video(delta: float) -> void:
@@ -130,14 +86,15 @@ func _process_video(delta: float) -> void:
 
 	decode_mutex.unlock()
 
-	if image_to_display != null:
-		if texture == null:
-			texture = ImageTexture.create_from_image(image_to_display)
-			video.texture = texture
-		else:
-			texture.update(image_to_display)
+	if is_instance_valid(image_to_display) and not image_to_display.is_empty():
+		if image_to_display != null and not image_to_display.is_empty():
+			if texture == null or texture.get_width() != image_to_display.get_width() or texture.get_height() != image_to_display.get_height():
+				texture = ImageTexture.create_from_image(image_to_display)
+				video.texture = texture
+			else:
+				texture.update(image_to_display)
 
-		displayed_frames += 1
+			displayed_frames += 1
 
 	var should_decode := false
 
@@ -213,14 +170,3 @@ func _stop_decode_thread() -> void:
 	decode_semaphore.post()
 	decode_thread.wait_to_finish()
 	decode_thread = null
-
-
-func _handle_closed(delta: float) -> void:
-	reconnect_timer += delta
-
-	if reconnect_timer < 3.0:
-		return
-
-	reconnect_timer = 0.0
-	socket = WebSocketPeer.new()
-	_connect_server()
