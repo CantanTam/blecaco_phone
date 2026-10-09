@@ -25,7 +25,7 @@ window/stretch/aspect="expand"
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/NativeCameraPlugin/plugin.cfg", "res://addons/gdscript_digit_mapper/plugin.cfg")
+enabled=PackedStringArray("res://addons/NativeCameraPlugin/plugin.cfg")
 
 [physics]
 
