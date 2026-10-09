@@ -4,6 +4,40 @@
 [ext_resource type="Script" uid="uid://brg6haegscnv7" path="res://scripts/main.gd" id="1_sugp2"]
 [ext_resource type="Script" uid="uid://c7sk4mvokgaov" path="res://scripts/connection.gd" id="2_jyhfs"]
 [ext_resource type="PackedScene" uid="uid://cqvo2vkjgr2xx" path="res://scenes/qrcode.tscn" id="2_sugp2"]
+[ext_resource type="PackedScene" uid="uid://dwv82d3ua535f" path="res://scenes/setting.tscn" id="4_tbgi4"]
+[ext_resource type="Script" uid="uid://t5ii3eyydvxr" path="res://scripts/record_button.gd" id="4_tefeu"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_qnk50"]
+bg_color = Color(1, 1, 1, 1)
+corner_radius_top_left = 75
+corner_radius_top_right = 75
+corner_radius_bottom_right = 75
+corner_radius_bottom_left = 75
+corner_detail = 20
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_sec1p"]
+bg_color = Color(1, 1, 1, 1)
+corner_radius_top_left = 75
+corner_radius_top_right = 75
+corner_radius_bottom_right = 75
+corner_radius_bottom_left = 75
+corner_detail = 20
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_a6nh6"]
+bg_color = Color(1, 1, 1, 1)
+corner_radius_top_left = 75
+corner_radius_top_right = 75
+corner_radius_bottom_right = 75
+corner_radius_bottom_left = 75
+corner_detail = 20
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_6hbff"]
+bg_color = Color(0.99607843, 0.22745098, 0.23137255, 1)
+corner_radius_top_left = 63
+corner_radius_top_right = 63
+corner_radius_bottom_right = 63
+corner_radius_bottom_left = 63
+corner_detail = 20
 
 [node name="Main" type="Control" unique_id=1033142112]
 layout_mode = 3
@@ -21,14 +55,41 @@ script = ExtResource("2_jyhfs")
 layout_mode = 1
 
 [node name="CommonUI" type="Control" parent="." unique_id=368223294]
-anchors_preset = 0
-offset_right = 40.0
-offset_bottom = 40.0
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="RecordButton" type="Button" parent="CommonUI" unique_id=786424927]
+layout_mode = 1
+anchors_preset = -1
+offset_left = 80.0
+offset_top = 50.0
+offset_right = 230.0
+offset_bottom = 200.0
+theme_override_styles/normal = SubResource("StyleBoxFlat_qnk50")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_sec1p")
+theme_override_styles/hover = SubResource("StyleBoxFlat_a6nh6")
+script = ExtResource("4_tefeu")
+
+[node name="Indicator" type="Panel" parent="CommonUI/RecordButton" unique_id=905152397]
+layout_mode = 1
+anchors_preset = -1
+offset_left = 12.0
+offset_top = 12.0
+offset_right = 138.0
+offset_bottom = 138.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_6hbff")
 
 [node name="ModeContainer" type="Control" parent="." unique_id=1559283247]
 anchors_preset = 0
 offset_right = 40.0
 offset_bottom = 40.0
+
+[node name="Setting" parent="ModeContainer" unique_id=2009646776 instance=ExtResource("4_tbgi4")]
+layout_mode = 1
 
 [node name="QRCode" parent="." unique_id=1616750411 instance=ExtResource("2_sugp2")]
 layout_mode = 1
