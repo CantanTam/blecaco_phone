@@ -24,9 +24,8 @@ const MAIN_CARD_SIZE := Vector2(560, 720)
 const SIDE_CARD_SIZE := Vector2(460, 620)
 
 const COVER_GAP := 30.0
-const ANIMATION_DURATION := 0.42
-const EDGE_FADE_DURATION := 0.24
-const EDGE_MOVE_DISTANCE := 260.0
+const ANIMATION_DURATION := 0.21
+const CENTER_POP_DURATION := 0.125
 
 @onready var cover_flow: Control = $CoverFlow
 
@@ -48,7 +47,6 @@ func _ready() -> void:
 			push_error("[ModeSelect] 找不到卡片：" + cover_name)
 			continue
 
-		# 隐藏 Panel 自身的背景，只显示封面图片。
 		cover.self_modulate = Color(1.0, 1.0, 1.0, 0.0)
 
 		var cover_image: TextureRect = cover.get_node_or_null(
@@ -56,7 +54,6 @@ func _ready() -> void:
 		) as TextureRect
 
 		if cover_image != null:
-			# 不再使用透视 Shader。
 			cover_image.material = null
 			cover_image.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
@@ -82,7 +79,8 @@ func _layout_covers() -> void:
 
 		var target: Dictionary = _get_cover_target(
 			i,
-			selected_index
+			selected_index,
+			true
 		)
 
 		var target_size: Vector2 = target["size"]
@@ -97,7 +95,7 @@ func _layout_covers() -> void:
 		cover.pivot_offset = target_size / 2.0
 		cover.rotation = 0.0
 		cover.z_index = target["z_index"]
-		cover.modulate = _get_cover_modulate(distance, 1.0,false)
+		cover.modulate = _get_cover_modulate(distance, 1.0, true)
 
 
 func _get_cover_distance(
@@ -116,7 +114,11 @@ func _get_cover_distance(
 	return distance
 
 
-func _get_cover_modulate(distance: int,alpha: float,highlight_center: bool = true) -> Color:
+func _get_cover_modulate(
+	distance: int,
+	alpha: float,
+	highlight_center: bool = true
+) -> Color:
 	var brightness: float = 0.45
 
 	if distance == 0 and highlight_center:
@@ -133,12 +135,24 @@ func _get_cover_modulate(distance: int,alpha: float,highlight_center: bool = tru
 		brightness,
 		final_alpha
 	)
-	
 
-func _get_cover_target(cover_index: int,selected_index: int,highlight_center: bool = true) -> Dictionary:
+
+func _get_step() -> float:
+	return SIDE_CARD_SIZE.x + COVER_GAP
+
+
+func _get_extra() -> float:
+	return (MAIN_CARD_SIZE.x - SIDE_CARD_SIZE.x) / 2.0
+
+
+func _get_cover_target(
+	cover_index: int,
+	selected_index: int,
+	highlight_center: bool = true
+) -> Dictionary:
 	var distance: int = _get_cover_distance(
-	cover_index,
-	selected_index
+		cover_index,
+		selected_index
 	)
 
 	var abs_distance: int = abs(distance)
@@ -149,26 +163,18 @@ func _get_cover_target(cover_index: int,selected_index: int,highlight_center: bo
 	if abs_distance == 0 and highlight_center:
 		card_size = MAIN_CARD_SIZE
 
-	# 根据相邻卡片的实际宽度计算间距。
-	# 即使中央卡片和两侧卡片尺寸不同，也不会相互重叠。
+	# 所有卡片中心始终按 SIDE.x + GAP 的等距网格排布。
+	# 只有真正高亮中心时，才把非中心卡片整体往外推
+	# (MAIN.x - SIDE.x) / 2，保证中央放大后相邻卡片仍然
+	# 保持 COVER_GAP 的间距。
+	var step: float = _get_step()
 	var horizontal_offset: float = 0.0
 
 	if abs_distance >= 1:
-		horizontal_offset = (
-			MAIN_CARD_SIZE.x / 2.0
-			+ SIDE_CARD_SIZE.x / 2.0
-			+ COVER_GAP
-		)
+		horizontal_offset = step * float(abs_distance)
 
-	if abs_distance >= 2:
-		horizontal_offset += (
-			SIDE_CARD_SIZE.x + COVER_GAP
-		)
-
-	if abs_distance >= 3:
-		horizontal_offset += (
-			SIDE_CARD_SIZE.x + COVER_GAP
-		)
+		if highlight_center:
+			horizontal_offset += _get_extra()
 
 	var direction: float = float(sign(distance))
 
@@ -216,13 +222,11 @@ func _on_cover_gui_input(
 	if cover_name.is_empty():
 		return
 
-	# 点击中央封面，确认当前模式。
 	if cover_name == selected_cover_name:
 		print("[ModeSelect] 确认模式：", cover_name)
 		mode_selected.emit(scene_path)
 		return
 
-	# 点击其他封面，循环移动到中央。
 	print("[ModeSelect] 滚动到中央：", cover_name)
 
 	cover_animation_running = true
@@ -258,8 +262,8 @@ func _animate_to_cover(cover_name: String) -> void:
 
 		await _animate_one_step(direction)
 
-	# 所有循环移动结束后，目标封面才放大并高亮
 	await _animate_center_cover()
+
 
 func _animate_one_step(direction: int) -> void:
 	var count: int = COVER_ORDER.size()
@@ -318,14 +322,16 @@ func _animate_one_step(direction: int) -> void:
 		false
 	)
 
-	# 如果从右向左移动，将即将从左侧出现的封面
-	# 在完全透明时移到目标位置，避免横穿整个屏幕。
+	var step: float = _get_step()
+	var extra: float = _get_extra()
+
+	# direction < 0 时新封面从左侧滑入，先把它放到目标位置
+	# 左侧 (step + extra) 处（完全透明），保证滑入过程中
+	# 与相邻卡片之间的 COVER_GAP 恒定。
 	if direction < 0:
-		# 先把封面放在最终位置的左侧，避免与原有封面重叠。
-		# 随后的 Tween 会让它连续向右滑入。
 		incoming_cover.position = (
 			incoming_target["position"]
-			+ Vector2(-SIDE_CARD_SIZE.x - COVER_GAP, 0.0)
+			+ Vector2(-(step + extra), 0.0)
 		)
 
 		incoming_cover.size = incoming_target["size"]
@@ -343,20 +349,46 @@ func _animate_one_step(direction: int) -> void:
 			false
 		)
 
-	# 其余封面连续移动、改变尺寸和亮度。
+	# 计算退出封面的滑出位移：
+	# 直接读取内侧相邻卡片本次的实际位移，让两者同方向、同距离
+	# 一起移动，这样它们之间的 COVER_GAP 保持恒定，速度也一致。
+	# 内侧相邻卡片指的是更靠近中心的那张。
+	var inner_neighbor_dir: int = 1 if direction > 0 else -1
+	var inner_neighbor_index: int = (
+		outgoing_index + inner_neighbor_dir + count
+	) % count
+
+	var inner_neighbor: Control = cover_flow.get_node_or_null(
+		COVER_ORDER[inner_neighbor_index]
+	) as Control
+
+	var outgoing_move_x: float = -float(direction) * (step - extra)
+
+	if inner_neighbor != null:
+		var inner_target: Dictionary = _get_cover_target(
+			inner_neighbor_index,
+			new_index,
+			false
+		)
+		outgoing_move_x = (
+			inner_target["position"].x
+			- inner_neighbor.position.x
+		)
+
+	# 其余封面一起线性移动 / 缩放 / 调亮度。
+	# 滚动全程 highlight_center = false，保证经过中间时不放大、不高亮。
 	var move_tween: Tween = create_tween()
 	move_tween.set_parallel(true)
 
 	for i in range(count):
+		if i == outgoing_index:
+			continue
+
 		var cover: Control = cover_flow.get_node_or_null(
 			COVER_ORDER[i]
 		) as Control
 
 		if cover == null:
-			continue
-
-		# 离场封面单独淡出，之后再移动到另一侧。
-		if i == outgoing_index:
 			continue
 
 		var target: Dictionary = _get_cover_target(
@@ -374,6 +406,7 @@ func _animate_one_step(direction: int) -> void:
 		)
 
 		cover.z_index = target["z_index"]
+		cover.pivot_offset = target_size / 2.0
 
 		move_tween.tween_property(
 			cover,
@@ -392,15 +425,12 @@ func _animate_one_step(direction: int) -> void:
 		move_tween.tween_property(
 			cover,
 			"modulate",
-			_get_cover_modulate(distance, 1.0),
+			_get_cover_modulate(distance, 1.0, false),
 			ANIMATION_DURATION
 		).set_trans(Tween.TRANS_LINEAR)
 
-	# 离场封面淡出，同时缓慢移出屏幕边缘。
-	var edge_offset: float = (
-		-float(direction) * EDGE_MOVE_DISTANCE
-	)
-
+	# 退出封面：用与其他卡片完全相同的持续时间和线性缓动滑出，
+	# 同时淡出。这样它的移动速度不再偏快。
 	var fade_out_tween: Tween = create_tween()
 	fade_out_tween.set_parallel(true)
 
@@ -408,19 +438,19 @@ func _animate_one_step(direction: int) -> void:
 		outgoing_cover,
 		"modulate:a",
 		0.0,
-		EDGE_FADE_DURATION
-	).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		ANIMATION_DURATION
+	).set_trans(Tween.TRANS_LINEAR)
 
 	fade_out_tween.tween_property(
 		outgoing_cover,
 		"position",
-		outgoing_cover.position + Vector2(edge_offset, 0.0),
-		EDGE_FADE_DURATION
-	).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		outgoing_cover.position + Vector2(outgoing_move_x, 0.0),
+		ANIMATION_DURATION
+	).set_trans(Tween.TRANS_LINEAR)
 
 	await fade_out_tween.finished
 
-	# 完全透明后，将离场封面放到最远位置。
+	# 完全透明后，将退出封面移到另一侧的最远位置。
 	outgoing_cover.position = outgoing_target["position"]
 	outgoing_cover.size = outgoing_target["size"]
 	outgoing_cover.pivot_offset = outgoing_cover.size / 2.0
@@ -437,13 +467,12 @@ func _animate_one_step(direction: int) -> void:
 		false
 	)
 
-	# 等待其余封面完成移动，防止连续点击时状态错乱。
 	if move_tween.is_running():
 		await move_tween.finished
 
 	selected_cover_name = COVER_ORDER[new_index]
-	
-	
+
+
 func _animate_center_cover() -> void:
 	var selected_index: int = COVER_ORDER.find(
 		selected_cover_name
@@ -452,42 +481,54 @@ func _animate_center_cover() -> void:
 	if selected_index == -1:
 		return
 
-	var cover: Control = cover_flow.get_node_or_null(
-		selected_cover_name
-	) as Control
-
-	if cover == null:
-		return
-
-	var center: Vector2 = cover_flow.size / 2.0
-	var target_position: Vector2 = (
-		center - MAIN_CARD_SIZE / 2.0
-	)
-
-	cover.pivot_offset = MAIN_CARD_SIZE / 2.0
-
+	# 所有封面一起 tween 到"高亮中心"的最终布局：只有被选中的那张
+	# 放大 + 提亮，两侧卡片同步被推开，始终维持 COVER_GAP。
 	var tween: Tween = create_tween()
 	tween.set_parallel(true)
 
-	tween.tween_property(
-		cover,
-		"size",
-		MAIN_CARD_SIZE,
-		0.25
-	).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	for i in range(COVER_ORDER.size()):
+		var cover: Control = cover_flow.get_node_or_null(
+			COVER_ORDER[i]
+		) as Control
 
-	tween.tween_property(
-		cover,
-		"position",
-		target_position,
-		0.25
-	).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		if cover == null:
+			continue
 
-	tween.tween_property(
-		cover,
-		"modulate",
-		Color(1.0, 1.0, 1.0, 1.0),
-		0.25
-	).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		var target: Dictionary = _get_cover_target(
+			i,
+			selected_index,
+			true
+		)
+
+		var target_size: Vector2 = target["size"]
+		var target_position: Vector2 = target["position"]
+		var distance: int = _get_cover_distance(
+			i,
+			selected_index
+		)
+
+		cover.z_index = target["z_index"]
+		cover.pivot_offset = target_size / 2.0
+
+		tween.tween_property(
+			cover,
+			"size",
+			target_size,
+			CENTER_POP_DURATION
+		).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+
+		tween.tween_property(
+			cover,
+			"position",
+			target_position,
+			CENTER_POP_DURATION
+		).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+
+		tween.tween_property(
+			cover,
+			"modulate",
+			_get_cover_modulate(distance, 1.0, true),
+			CENTER_POP_DURATION
+		).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 
 	await tween.finished
