@@ -6,6 +6,7 @@
 [ext_resource type="PackedScene" uid="uid://cqvo2vkjgr2xx" path="res://scenes/qrcode.tscn" id="2_sugp2"]
 [ext_resource type="PackedScene" uid="uid://dwv82d3ua535f" path="res://scenes/setting.tscn" id="4_tbgi4"]
 [ext_resource type="Script" uid="uid://t5ii3eyydvxr" path="res://scripts/record_button.gd" id="4_tefeu"]
+[ext_resource type="Script" uid="uid://dt4uybh6725bq" path="res://scripts/top_edge_area.gd" id="6_o6xl0"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_qnk50"]
 bg_color = Color(1, 1, 1, 1)
@@ -38,6 +39,9 @@ corner_radius_top_right = 63
 corner_radius_bottom_right = 63
 corner_radius_bottom_left = 63
 corner_detail = 20
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_o6xl0"]
+bg_color = Color(1, 1, 1, 1)
 
 [node name="Main" type="Control" unique_id=1033142112]
 layout_mode = 3
@@ -84,12 +88,53 @@ offset_bottom = 138.0
 theme_override_styles/panel = SubResource("StyleBoxFlat_6hbff")
 
 [node name="ModeContainer" type="Control" parent="." unique_id=1559283247]
-anchors_preset = 0
-offset_right = 40.0
-offset_bottom = 40.0
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
 
 [node name="Setting" parent="ModeContainer" unique_id=2009646776 instance=ExtResource("4_tbgi4")]
 layout_mode = 1
+mouse_filter = 2
+
+[node name="TopEdgeArea" type="Control" parent="ModeContainer/Setting" unique_id=1278452578]
+layout_mode = 1
+anchor_left = 0.25
+anchor_right = 0.75
+offset_top = 70.0
+offset_bottom = 190.0
+script = ExtResource("6_o6xl0")
+
+[node name="OptionPanel" type="PanelContainer" parent="ModeContainer/Setting" unique_id=1088226641]
+visible = false
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.25
+anchor_right = 0.75
+offset_top = -200.0
+offset_bottom = -10.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_o6xl0")
+
+[node name="OptionButtons" type="HBoxContainer" parent="ModeContainer/Setting/OptionPanel" unique_id=534124980]
+layout_mode = 2
+
+[node name="AddonSetButton" type="Button" parent="ModeContainer/Setting/OptionPanel/OptionButtons" unique_id=1573974518]
+layout_mode = 2
+
+[node name="CameraSetButton" type="Button" parent="ModeContainer/Setting/OptionPanel/OptionButtons" unique_id=2113692362]
+layout_mode = 2
+
+[node name="ModeSetButton" type="Button" parent="ModeContainer/Setting/OptionPanel/OptionButtons" unique_id=128769672]
+layout_mode = 2
+
+[node name="ShadeSetButton" type="Button" parent="ModeContainer/Setting/OptionPanel/OptionButtons" unique_id=1053575687]
+layout_mode = 2
+
+[node name="PreviewSetButton" type="Button" parent="ModeContainer/Setting/OptionPanel/OptionButtons" unique_id=894489999]
+layout_mode = 2
 
 [node name="QRCode" parent="." unique_id=1616750411 instance=ExtResource("2_sugp2")]
 layout_mode = 1

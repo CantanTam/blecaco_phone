@@ -64,16 +64,5 @@ anchor_bottom = 0.875
 layout_mode = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_qnk50")
 
-[node name="StatusLabel" type="Label" parent="ScanFrame/FrameBorder" unique_id=369675825]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_font_sizes/font_size = 60
-horizontal_alignment = 1
-vertical_alignment = 1
-
 [node name="NativeCamera" type="Node" parent="." unique_id=293128046]
 script = ExtResource("2_sihoj")
