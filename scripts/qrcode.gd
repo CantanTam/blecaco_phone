@@ -4,7 +4,6 @@ signal qr_scanned(url: String)
 
 @onready var camera: NativeCamera = $NativeCamera
 @onready var preview: TextureRect = $CameraPreview
-@onready var status_label: Label = $ScanFrame/FrameBorder/StatusLabel
 
 var camera_texture: ImageTexture
 var zxing_helper
@@ -112,16 +111,13 @@ func _on_camera_frame(frame: FrameInfo) -> void:
 
 	if result != "":
 		scanning = false
-		status_label.text = "二维码错误"
 		print("QR detected: ", result)
 		qr_scanned.emit(result)
 
 
 func show_error() -> void:
-	status_label.text = "开始连接"
 	scanning = true
 
 
 func show_connecting() -> void:
-	status_label.text = "二维码错误"
 	scanning = false
