@@ -91,20 +91,39 @@ func _receive_packets() -> void:
 			text_message_received.emit(packet.get_string_from_utf8())
 		else:
 			binary_message_received.emit(packet)
+# json 结构
+func send_action(mode: String, data: Dictionary) -> bool:
+	var message := {
+		"type": "action",
+		"mode": mode,
+		"data": data
+		}
+	return send_json(message)
 
 
+func send_setting(setting_name: String, value: Variant) -> bool:
+	var message := {
+		"type": "setting",
+		"name": setting_name,
+		"value": value
+		}
+	return send_json(message)
+	
 func send_json(data: Dictionary) -> bool:
 	if socket.get_ready_state() != WebSocketPeer.STATE_OPEN:
 		print("[Godot] Cannot send JSON: WebSocket is not connected")
 		return false
 
 	var message := JSON.stringify(data)
+	print("[Godot] Sending JSON: ", message)
+
 	var error := socket.send_text(message)
 
 	if error != OK:
 		print("[Godot] Failed to send JSON: ", error)
 		return false
 
+	print("[Godot] JSON queued successfully")
 	return true
 
 
