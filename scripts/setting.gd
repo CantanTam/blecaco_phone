@@ -4,6 +4,8 @@ extends Control
 @onready var connection: Node = get_node_or_null("../../Connection")
 @onready var top_edge_area = $TopEdgeArea
 @onready var option_panel: PanelContainer = $OptionPanel
+@onready var content_host: Control = $ContentHost
+@onready var mode_set_button: Button = $OptionPanel/ButtonMargins/OptionButtons/ModeSetButton
 
 const HIDDEN_TOP := -200.0
 const HIDDEN_BOTTOM := -10.0
@@ -22,6 +24,7 @@ func _ready() -> void:
 
 	top_edge_area.swipe_down.connect(_show_option_panel)
 	top_edge_area.swipe_up.connect(_hide_option_panel)
+	mode_set_button.toggled.connect(_on_mode_set_toggled)
 
 	option_panel.visible = false
 	option_panel.modulate.a = 0.0
@@ -68,3 +71,29 @@ func _stop_animation() -> void:
 
 func _finish_hide() -> void:
 	option_panel.visible = false
+	
+	
+func _on_mode_set_toggled(is_toggled: bool) -> void:
+	for child in content_host.get_children():
+		child.queue_free()
+
+	if not is_toggled:
+		print("[Setting] 已收起 ModeSelect")
+		return
+
+	var mode_scene := load(
+		"res://scenes/mode_select.tscn"
+	) as PackedScene
+
+	if mode_scene == null:
+		push_error("[Setting] 找不到 res://scenes/mode_select.tscn")
+		return
+
+	var mode_instance := mode_scene.instantiate() as Control
+
+	if mode_instance == null:
+		push_error("[Setting] ModeSelect 实例化失败")
+		return
+
+	content_host.add_child(mode_instance)
+	print("[Setting] 已打开 ModeSelect")

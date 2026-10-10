@@ -7,6 +7,12 @@
 [ext_resource type="PackedScene" uid="uid://dwv82d3ua535f" path="res://scenes/setting.tscn" id="4_tbgi4"]
 [ext_resource type="Script" uid="uid://t5ii3eyydvxr" path="res://scripts/record_button.gd" id="4_tefeu"]
 [ext_resource type="Script" uid="uid://dt4uybh6725bq" path="res://scripts/top_edge_area.gd" id="6_o6xl0"]
+[ext_resource type="Texture2D" uid="uid://bhhaqgr83jacj" path="res://resources/AddonSet.svg" id="7_eb6dy"]
+[ext_resource type="Texture2D" uid="uid://cw42vnbalgnhg" path="res://resources/ActiveCamSet.svg" id="8_a8y0u"]
+[ext_resource type="Texture2D" uid="uid://dafovemm2b11c" path="res://resources/CameraSet.svg" id="8_trceg"]
+[ext_resource type="Texture2D" uid="uid://dj8ejxar6n5h3" path="res://resources/ModeSet.svg" id="9_a8y0u"]
+[ext_resource type="Texture2D" uid="uid://c2iva32qn32p" path="res://resources/ShadeSet.svg" id="10_jkv2x"]
+[ext_resource type="Texture2D" uid="uid://bl55j1x1x4gr0" path="res://resources/PreviewSet.svg" id="11_jbj1t"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_qnk50"]
 bg_color = Color(1, 1, 1, 1)
@@ -40,8 +46,43 @@ corner_radius_bottom_right = 63
 corner_radius_bottom_left = 63
 corner_detail = 20
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_o6xl0"]
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_e8su7"]
+bg_color = Color(0.6, 0.6, 0.6, 0)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_loat6"]
+bg_color = Color(1, 1, 1, 0.47058824)
+corner_radius_top_left = 75
+corner_radius_top_right = 75
+corner_radius_bottom_right = 75
+corner_radius_bottom_left = 75
+corner_detail = 20
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_gsaqu"]
 bg_color = Color(1, 1, 1, 1)
+corner_radius_top_left = 75
+corner_radius_top_right = 75
+corner_radius_bottom_right = 75
+corner_radius_bottom_left = 75
+corner_detail = 20
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_odhy6"]
+bg_color = Color(1, 1, 1, 0.47058824)
+corner_radius_top_left = 75
+corner_radius_top_right = 75
+corner_radius_bottom_right = 75
+corner_radius_bottom_left = 75
+corner_detail = 20
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_5urx4"]
+bg_color = Color(1, 1, 1, 1)
+corner_radius_top_left = 75
+corner_radius_top_right = 75
+corner_radius_bottom_right = 75
+corner_radius_bottom_left = 75
+corner_detail = 20
+
+[sub_resource type="ButtonGroup" id="ButtonGroup_6hbff"]
+allow_unpress = true
 
 [node name="Main" type="Control" unique_id=1033142112]
 layout_mode = 3
@@ -108,33 +149,102 @@ offset_top = 70.0
 offset_bottom = 190.0
 script = ExtResource("6_o6xl0")
 
-[node name="OptionPanel" type="PanelContainer" parent="ModeContainer/Setting" unique_id=1088226641]
-visible = false
+[node name="OptionPanel" type="PanelContainer" parent="ModeContainer/Setting" unique_id=1203511249]
 layout_mode = 1
 anchors_preset = -1
-anchor_left = 0.25
-anchor_right = 0.75
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -600.0
 offset_top = -200.0
+offset_right = 600.0
 offset_bottom = -10.0
-theme_override_styles/panel = SubResource("StyleBoxFlat_o6xl0")
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_e8su7")
 
-[node name="OptionButtons" type="HBoxContainer" parent="ModeContainer/Setting/OptionPanel" unique_id=534124980]
+[node name="ButtonMargins" type="MarginContainer" parent="ModeContainer/Setting/OptionPanel" unique_id=1194731521]
 layout_mode = 2
+theme_override_constants/margin_left = 25
+theme_override_constants/margin_top = 40
+theme_override_constants/margin_right = 25
 
-[node name="AddonSetButton" type="Button" parent="ModeContainer/Setting/OptionPanel/OptionButtons" unique_id=1573974518]
+[node name="OptionButtons" type="HBoxContainer" parent="ModeContainer/Setting/OptionPanel/ButtonMargins" unique_id=67179045]
 layout_mode = 2
+theme_override_constants/separation = 50
 
-[node name="CameraSetButton" type="Button" parent="ModeContainer/Setting/OptionPanel/OptionButtons" unique_id=2113692362]
+[node name="AddonSetButton" type="Button" parent="ModeContainer/Setting/OptionPanel/ButtonMargins/OptionButtons" unique_id=1573974518]
+custom_minimum_size = Vector2(150, 150)
 layout_mode = 2
+theme_override_styles/normal = SubResource("StyleBoxFlat_loat6")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_gsaqu")
+theme_override_styles/hover = SubResource("StyleBoxFlat_odhy6")
+theme_override_styles/hover_pressed = SubResource("StyleBoxFlat_5urx4")
+toggle_mode = true
+button_group = SubResource("ButtonGroup_6hbff")
+icon = ExtResource("7_eb6dy")
 
-[node name="ModeSetButton" type="Button" parent="ModeContainer/Setting/OptionPanel/OptionButtons" unique_id=128769672]
+[node name="ActiveCameSetButton" type="Button" parent="ModeContainer/Setting/OptionPanel/ButtonMargins/OptionButtons" unique_id=2045232839]
+custom_minimum_size = Vector2(150, 150)
 layout_mode = 2
+theme_override_styles/normal = SubResource("StyleBoxFlat_loat6")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_gsaqu")
+theme_override_styles/hover = SubResource("StyleBoxFlat_odhy6")
+theme_override_styles/hover_pressed = SubResource("StyleBoxFlat_5urx4")
+toggle_mode = true
+button_group = SubResource("ButtonGroup_6hbff")
+icon = ExtResource("8_a8y0u")
 
-[node name="ShadeSetButton" type="Button" parent="ModeContainer/Setting/OptionPanel/OptionButtons" unique_id=1053575687]
+[node name="CameraSetButton" type="Button" parent="ModeContainer/Setting/OptionPanel/ButtonMargins/OptionButtons" unique_id=111036300]
+custom_minimum_size = Vector2(150, 150)
 layout_mode = 2
+theme_override_styles/normal = SubResource("StyleBoxFlat_loat6")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_gsaqu")
+theme_override_styles/hover = SubResource("StyleBoxFlat_odhy6")
+theme_override_styles/hover_pressed = SubResource("StyleBoxFlat_5urx4")
+toggle_mode = true
+button_group = SubResource("ButtonGroup_6hbff")
+icon = ExtResource("8_trceg")
 
-[node name="PreviewSetButton" type="Button" parent="ModeContainer/Setting/OptionPanel/OptionButtons" unique_id=894489999]
+[node name="ModeSetButton" type="Button" parent="ModeContainer/Setting/OptionPanel/ButtonMargins/OptionButtons" unique_id=541822083]
+custom_minimum_size = Vector2(150, 150)
 layout_mode = 2
+theme_override_styles/normal = SubResource("StyleBoxFlat_loat6")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_gsaqu")
+theme_override_styles/hover = SubResource("StyleBoxFlat_odhy6")
+theme_override_styles/hover_pressed = SubResource("StyleBoxFlat_5urx4")
+toggle_mode = true
+button_group = SubResource("ButtonGroup_6hbff")
+icon = ExtResource("9_a8y0u")
+
+[node name="ShadeSetButton" type="Button" parent="ModeContainer/Setting/OptionPanel/ButtonMargins/OptionButtons" unique_id=1729522623]
+custom_minimum_size = Vector2(150, 150)
+layout_mode = 2
+theme_override_styles/normal = SubResource("StyleBoxFlat_loat6")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_gsaqu")
+theme_override_styles/hover = SubResource("StyleBoxFlat_odhy6")
+theme_override_styles/hover_pressed = SubResource("StyleBoxFlat_5urx4")
+toggle_mode = true
+button_group = SubResource("ButtonGroup_6hbff")
+icon = ExtResource("10_jkv2x")
+
+[node name="PreviewSetButton" type="Button" parent="ModeContainer/Setting/OptionPanel/ButtonMargins/OptionButtons" unique_id=1301216503]
+custom_minimum_size = Vector2(150, 150)
+layout_mode = 2
+theme_override_styles/normal = SubResource("StyleBoxFlat_loat6")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_gsaqu")
+theme_override_styles/hover = SubResource("StyleBoxFlat_odhy6")
+theme_override_styles/hover_pressed = SubResource("StyleBoxFlat_5urx4")
+toggle_mode = true
+button_group = SubResource("ButtonGroup_6hbff")
+icon = ExtResource("11_jbj1t")
+
+[node name="ContentHost" type="Control" parent="ModeContainer/Setting" unique_id=205334130]
+layout_mode = 1
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = 190.0
+grow_horizontal = 2
+grow_vertical = 2
 
 [node name="QRCode" parent="." unique_id=1616750411 instance=ExtResource("2_sugp2")]
 layout_mode = 1
