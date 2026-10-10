@@ -4,12 +4,14 @@ signal binary_message_received(data: PackedByteArray)
 signal text_message_received(message: String)
 signal connection_succeeded
 signal connection_failed
+signal connection_lost
 
 const INITIAL_CONNECTION_TIMEOUT := 2.0
 const RECONNECT_INTERVAL := 3.0
 
 var server_url := ""
 var waiting_for_initial_connection := false
+var has_connected_once := false
 var initial_connection_timer := 0.0
 var reconnect_timer := 0.0
 
@@ -38,6 +40,7 @@ func _process(delta: float) -> void:
 
 			if waiting_for_initial_connection:
 				waiting_for_initial_connection = false
+				has_connected_once = true
 				print("[Godot] Stream connection succeeded")
 				connection_succeeded.emit()
 
@@ -48,6 +51,14 @@ func _process(delta: float) -> void:
 				waiting_for_initial_connection = false
 				print("[Godot] Stream connection failed")
 				connection_failed.emit()
+
+			elif has_connected_once:
+				has_connected_once = false
+				server_url = ""
+
+				print("[Godot] Blender stream disconnected")
+				connection_lost.emit()
+
 			else:
 				_handle_closed(delta)
 
