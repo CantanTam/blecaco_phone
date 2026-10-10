@@ -1,0 +1,138 @@
+[gd_scene format=3 uid="uid://c75k8m3i7qak6"]
+
+[ext_resource type="Script" uid="uid://itqitru0heuh" path="res://scripts/mode_select.gd" id="1_pcda8"]
+[ext_resource type="Texture2D" uid="uid://05wf84m7yjic" path="res://resources/FreeMode.svg" id="1_pskx3"]
+[ext_resource type="Texture2D" uid="uid://chausd0tyl3si" path="res://resources/PlaneMode.svg" id="2_yjc6h"]
+[ext_resource type="Texture2D" uid="uid://bjfsl2km5kjsm" path="res://resources/CarMode.svg" id="3_pcda8"]
+[ext_resource type="Texture2D" uid="uid://g7uj3dp1r77p" path="res://resources/GameMode.svg" id="4_sx8c6"]
+[ext_resource type="Texture2D" uid="uid://cf5xe046fh0ej" path="res://resources/CameraMode.svg" id="5_dxjqd"]
+[ext_resource type="Texture2D" uid="uid://rhxgb6wsi6ah" path="res://resources/DroneMode.svg" id="6_xuogk"]
+
+[node name="ModeSelect" type="Control" unique_id=1451242520]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_pcda8")
+
+[node name="CoverFlow" type="Control" parent="." unique_id=410167652]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="FreeCover" type="Panel" parent="CoverFlow" unique_id=755658535]
+z_index = 3
+layout_mode = 0
+offset_left = 680.0
+offset_top = 180.0
+offset_right = 1240.0
+offset_bottom = 900.0
+
+[node name="CoverImage" type="TextureRect" parent="CoverFlow/FreeCover" unique_id=1769396544]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("1_pskx3")
+expand_mode = 1
+stretch_mode = 6
+
+[node name="PlaneCover" type="Panel" parent="CoverFlow" unique_id=2051283670]
+z_index = 2
+layout_mode = 0
+offset_left = 380.0
+offset_top = 230.0
+offset_right = 840.0
+offset_bottom = 850.0
+
+[node name="CoverImage" type="TextureRect" parent="CoverFlow/PlaneCover" unique_id=1808497069]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("2_yjc6h")
+expand_mode = 1
+stretch_mode = 6
+
+[node name="CarCover" type="Panel" parent="CoverFlow" unique_id=1128510047]
+z_index = 2
+layout_mode = 0
+offset_left = 1080.0
+offset_top = 230.0
+offset_right = 1540.0
+offset_bottom = 850.0
+
+[node name="CoverImage" type="TextureRect" parent="CoverFlow/CarCover" unique_id=805304523]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("3_pcda8")
+expand_mode = 1
+stretch_mode = 6
+
+[node name="GameCover" type="Panel" parent="CoverFlow" unique_id=2120980120]
+z_index = 1
+layout_mode = 0
+offset_left = 1380.0
+offset_top = 230.0
+offset_right = 1840.0
+offset_bottom = 850.0
+
+[node name="CoverImage" type="TextureRect" parent="CoverFlow/GameCover" unique_id=1136624239]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("4_sx8c6")
+expand_mode = 1
+stretch_mode = 6
+
+[node name="CameraCover" type="Panel" parent="CoverFlow" unique_id=1521446610]
+layout_mode = 0
+offset_left = -80.0
+offset_top = 230.0
+offset_right = 380.0
+offset_bottom = 850.0
+
+[node name="CoverImage" type="TextureRect" parent="CoverFlow/CameraCover" unique_id=963257979]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("5_dxjqd")
+expand_mode = 1
+stretch_mode = 6
+
+[node name="DroneCover" type="Panel" parent="CoverFlow" unique_id=2072042599]
+layout_mode = 0
+offset_left = 1580.0
+offset_top = 230.0
+offset_right = 2040.0
+offset_bottom = 850.0
+
+[node name="CoverImage" type="TextureRect" parent="CoverFlow/DroneCover" unique_id=1832045069]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("6_xuogk")
+expand_mode = 1
+stretch_mode = 6
