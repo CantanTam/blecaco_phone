@@ -88,6 +88,13 @@ func _stop_animation() -> void:
 
 func _finish_hide() -> void:
 	option_panel.visible = false
+
+	for child in content_host.get_children():
+		child.queue_free()
+
+	mode_set_button.set_pressed_no_signal(false)
+
+	print("[Setting] OptionPanel 已隐藏，设置界面已关闭")
 	
 	
 func _on_mode_set_toggled(is_toggled: bool) -> void:
