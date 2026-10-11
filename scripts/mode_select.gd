@@ -30,11 +30,16 @@ const CENTER_POP_DURATION := 0.125
 @onready var cover_flow: Control = $CoverFlow
 
 var selected_cover_name: String = "FreeCover"
+var current_mode_scene_path: String = "res://scenes/modes/free_mode.tscn"
 var cover_animation_running: bool = false
-
 
 func _ready() -> void:
 	await get_tree().process_frame
+
+	for cover_name in MODE_SCENES:
+		if MODE_SCENES[cover_name] == current_mode_scene_path:
+			selected_cover_name = cover_name
+			break
 
 	_layout_covers()
 

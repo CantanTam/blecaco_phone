@@ -7,6 +7,19 @@ extends Control
 
 const DEFAULT_MODE_SCENE := "res://scenes/modes/free_mode.tscn"
 
+const SETTINGS_FILE := "user://blecaco_settings.cfg"
+const MODE_SECTION := "mode"
+const MODE_KEY := "scene_path"
+
+const VALID_MODE_SCENE_PATHS := [
+	"res://scenes/modes/free_mode.tscn",
+	"res://scenes/modes/plane_mode.tscn",
+	"res://scenes/modes/car_mode.tscn",
+	"res://scenes/modes/game_mode.tscn",
+	"res://scenes/modes/camera_mode.tscn",
+	"res://scenes/modes/drone_mode.tscn"
+]
+
 
 func _ready() -> void:
 	qr_code.qr_scanned.connect(_on_qr_scanned)
@@ -29,7 +42,7 @@ func _on_stream_connection_succeeded() -> void:
 
 	qr_code.visible = false
 	stream.visible = true
-	_load_active_mode(DEFAULT_MODE_SCENE)
+	_load_active_mode(_get_saved_mode_scene_path())
 	
 
 func _on_stream_connection_failed() -> void:
@@ -66,3 +79,27 @@ func _clear_active_mode() -> void:
 	for child in active_mode_host.get_children():
 		active_mode_host.remove_child(child)
 		child.queue_free()
+
+
+func _get_saved_mode_scene_path() -> String:
+	var config := ConfigFile.new()
+	var error := config.load(SETTINGS_FILE)
+
+	if error != OK:
+		return DEFAULT_MODE_SCENE
+
+	var saved_path: String = str(
+		config.get_value(
+			MODE_SECTION,
+			MODE_KEY,
+			DEFAULT_MODE_SCENE
+		)
+	)
+
+	if (
+		VALID_MODE_SCENE_PATHS.has(saved_path)
+		and ResourceLoader.exists(saved_path)
+	):
+		return saved_path
+
+	return DEFAULT_MODE_SCENE
