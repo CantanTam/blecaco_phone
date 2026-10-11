@@ -3,6 +3,9 @@ extends Control
 @onready var qr_code = $QRCode
 @onready var stream = $Stream
 @onready var connection = $Connection
+@onready var active_mode_host: Control = $ModeContainer/ActiveModeHost
+
+const DEFAULT_MODE_SCENE := "res://scenes/modes/free_mode.tscn"
 
 
 func _ready() -> void:
@@ -26,10 +29,12 @@ func _on_stream_connection_succeeded() -> void:
 
 	qr_code.visible = false
 	stream.visible = true
-
+	_load_active_mode(DEFAULT_MODE_SCENE)
+	
 
 func _on_stream_connection_failed() -> void:
 	print("[Main] Stream connection failed")
+	_clear_active_mode()
 
 	qr_code.visible = true
 	stream.visible = false
@@ -38,7 +43,26 @@ func _on_stream_connection_failed() -> void:
 
 func _on_connection_lost() -> void:
 	print("[Main] Blender disconnected")
+	_clear_active_mode()
 
 	stream.visible = false
 	qr_code.visible = true
 	qr_code.show_error()
+	
+	
+func _load_active_mode(scene_path: String) -> void:
+	_clear_active_mode()
+
+	var packed_scene := load(scene_path) as PackedScene
+	if packed_scene == null:
+		push_error("[Main] 无法加载模式场景: " + scene_path)
+		return
+
+	var mode_instance := packed_scene.instantiate()
+	active_mode_host.add_child(mode_instance)
+
+
+func _clear_active_mode() -> void:
+	for child in active_mode_host.get_children():
+		active_mode_host.remove_child(child)
+		child.queue_free()

@@ -5,6 +5,7 @@ extends Control
 @onready var top_edge_area = $TopEdgeArea
 @onready var option_panel: PanelContainer = $OptionPanel
 @onready var content_host: Control = $ContentHost
+@onready var active_mode_host: Control = get_node_or_null("../ActiveModeHost") as Control
 @onready var mode_set_button: Button = $OptionPanel/ButtonMargins/OptionButtons/ModeSetButton
 
 const HIDDEN_TOP := -200.0
@@ -95,5 +96,40 @@ func _on_mode_set_toggled(is_toggled: bool) -> void:
 		push_error("[Setting] ModeSelect 实例化失败")
 		return
 
+	mode_instance.connect(
+		"mode_selected",
+		Callable(self, "_on_mode_selected")
+	)
+
 	content_host.add_child(mode_instance)
 	print("[Setting] 已打开 ModeSelect")
+	
+	
+func _on_mode_selected(scene_path: String) -> void:
+	if active_mode_host == null:
+		push_error("[Setting] 找不到 ActiveModeHost")
+		return
+
+	var packed_scene := load(scene_path) as PackedScene
+
+	if packed_scene == null:
+		push_error("[Setting] 无法加载模式场景：" + scene_path)
+		return
+
+	var mode_instance := packed_scene.instantiate() as Control
+
+	if mode_instance == null:
+		push_error("[Setting] 模式场景实例化失败：" + scene_path)
+		return
+
+	for child in active_mode_host.get_children():
+		child.queue_free()
+
+	active_mode_host.add_child(mode_instance)
+
+	for child in content_host.get_children():
+		child.queue_free()
+
+	mode_set_button.set_pressed_no_signal(false)
+
+	print("[Setting] 已切换模式：", scene_path)

@@ -99,15 +99,25 @@ script = ExtResource("2_jyhfs")
 [node name="Stream" parent="." unique_id=1261490250 instance=ExtResource("1_0wfyh")]
 layout_mode = 1
 
-[node name="CommonUI" type="Control" parent="." unique_id=368223294]
+[node name="ModeContainer" type="Control" parent="." unique_id=1559283247]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 
-[node name="RecordButton" type="Button" parent="CommonUI" unique_id=786424927]
+[node name="ActiveModeHost" type="Control" parent="ModeContainer" unique_id=539645979]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="RecordButton" type="Button" parent="ModeContainer" unique_id=786424927]
 layout_mode = 1
 anchors_preset = -1
 offset_left = 80.0
@@ -119,7 +129,7 @@ theme_override_styles/pressed = SubResource("StyleBoxFlat_sec1p")
 theme_override_styles/hover = SubResource("StyleBoxFlat_a6nh6")
 script = ExtResource("4_tefeu")
 
-[node name="Indicator" type="Panel" parent="CommonUI/RecordButton" unique_id=905152397]
+[node name="Indicator" type="Panel" parent="ModeContainer/RecordButton" unique_id=905152397]
 layout_mode = 1
 anchors_preset = -1
 offset_left = 12.0
@@ -127,15 +137,6 @@ offset_top = 12.0
 offset_right = 138.0
 offset_bottom = 138.0
 theme_override_styles/panel = SubResource("StyleBoxFlat_6hbff")
-
-[node name="ModeContainer" type="Control" parent="." unique_id=1559283247]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
 
 [node name="Setting" parent="ModeContainer" unique_id=2009646776 instance=ExtResource("4_tbgi4")]
 layout_mode = 1
@@ -240,6 +241,7 @@ icon = ExtResource("11_jbj1t")
 
 [node name="ContentHost" type="Control" parent="ModeContainer/Setting" unique_id=205334130]
 layout_mode = 1
+anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_top = 190.0

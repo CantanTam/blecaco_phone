@@ -3,12 +3,12 @@ extends Control
 signal mode_selected(scene_path: String)
 
 const MODE_SCENES := {
-	"FreeCover": "res://scenes/modes/free.tscn",
-	"PlaneCover": "res://scenes/modes/plane.tscn",
-	"CarCover": "res://scenes/modes/car.tscn",
-	"GameCover": "res://scenes/modes/game.tscn",
-	"CameraCover": "res://scenes/modes/camera.tscn",
-	"DroneCover": "res://scenes/modes/drone.tscn"
+	"FreeCover": "res://scenes/modes/free_mode.tscn",
+	"PlaneCover": "res://scenes/modes/plane_mode.tscn",
+	"CarCover": "res://scenes/modes/car_mode.tscn",
+	"GameCover": "res://scenes/modes/game_mode.tscn",
+	"CameraCover": "res://scenes/modes/camera_mode.tscn",
+	"DroneCover": "res://scenes/modes/drone_mode.tscn"
 }
 
 const COVER_ORDER := [
