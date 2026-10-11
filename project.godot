@@ -14,6 +14,8 @@ config/name="Blecaco"
 config/description="Blender Camera Controler: use your android phone to controal Blender's camera"
 run/main_scene="uid://cfh1jqoadil7e"
 config/features=PackedStringArray("4.7", "Mobile")
+boot_splash/bg_color=Color(0.14117648, 0.14117648, 1, 1)
+boot_splash/stretch_mode=0
 config/icon="res://icon.svg"
 
 [display]
@@ -25,7 +27,12 @@ window/stretch/aspect="expand"
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/NativeCameraPlugin/plugin.cfg", "res://addons/gdscript_digit_mapper/plugin.cfg")
+enabled=PackedStringArray("res://addons/GodotAndroidPluginTemplate/plugin.cfg", "res://addons/NativeCameraPlugin/plugin.cfg", "res://addons/gdscript_digit_mapper/plugin.cfg")
+
+[input_devices]
+
+sensors/enable_accelerometer=true
+sensors/enable_gyroscope=true
 
 [physics]
 

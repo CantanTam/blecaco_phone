@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://m861me5irffp"]
+
+[ext_resource type="Script" uid="uid://bbwis1mvb2gva" path="res://scripts/gyroscope_test.gd" id="1_u2rai"]
+
+[node name="Node" type="Node" unique_id=2053801768]
+script = ExtResource("1_u2rai")

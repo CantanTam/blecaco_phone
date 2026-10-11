@@ -1,5 +1,7 @@
 [gd_scene format=3 uid="uid://cua0spcdm0i2h"]
 
+[ext_resource type="Script" uid="uid://s6ggvc81fx7" path="res://scripts/modes/free_mode.gd" id="1_cx1p0"]
+
 [node name="FreeMode" type="Control" unique_id=311837689]
 layout_mode = 3
 anchors_preset = 15
@@ -8,6 +10,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
+script = ExtResource("1_cx1p0")
 
 [node name="ColorRect" type="ColorRect" parent="." unique_id=303001493]
 layout_mode = 1
