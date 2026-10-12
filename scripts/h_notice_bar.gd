@@ -1,4 +1,3 @@
-
 extends Panel
 
 # 长条厚度（像素）
@@ -6,6 +5,7 @@ const NOTICE_BAR_THICKNESS := 10.0
 
 # 长条与扫描框底部的间距（像素）
 const NOTICE_BAR_MARGIN := 10.0
+var cos_theta: float = 1.0
 
 
 func _ready() -> void:
@@ -26,6 +26,7 @@ func _process(_delta: float) -> void:
 
 	# 默认保持最大长度
 	var h_ratio := 1.0
+	var display_ratio := 1.0
 
 	if gravity_length > 0.1:
 		# 根据当前屏幕方向选择手机长轴对应的重力分量
@@ -46,14 +47,16 @@ func _process(_delta: float) -> void:
 		)
 
 		h_ratio = 1.0 - axis_ratio
+		display_ratio = acos(axis_ratio) / (PI / 2.0)
 
+	cos_theta = h_ratio
 	# 父节点 FrameBorder 的宽度就是长条的最大长度
 	var frame_border := get_parent() as Control
 
 	if frame_border == null:
 		return
 
-	var h_length := frame_border.size.x * h_ratio
+	var h_length := frame_border.size.x * display_ratio
 
 	# 左右对称收缩，始终保持水平居中
 	offset_left = -h_length / 2.0

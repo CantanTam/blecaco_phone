@@ -4,11 +4,15 @@
 [ext_resource type="Shader" uid="uid://5lo53g6s4d8g" path="res://resources/qrcode.gdshader" id="2_ix88b"]
 [ext_resource type="Script" uid="uid://iws2m5f75rfc" path="res://addons/NativeCameraPlugin/NativeCamera.gd" id="2_sihoj"]
 [ext_resource type="Texture2D" uid="uid://bffh84mavc4ku" path="res://resources/RotateNotice.svg" id="3_ix88b"]
+[ext_resource type="Script" uid="uid://bhho81r7c6fga" path="res://scripts/rotate_notice.gd" id="4_gjlsf"]
 [ext_resource type="Script" uid="uid://brbsj434u0377" path="res://scripts/h_notice_bar.gd" id="4_pqttr"]
 [ext_resource type="Script" uid="uid://8eqcm5xi2kls" path="res://scripts/v_notice_bar.gd" id="5_gjlsf"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_qnk50"]
 shader = ExtResource("2_ix88b")
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_gjlsf"]
+bg_color = Color(0, 0, 0, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_qnk50"]
 bg_color = Color(0.6, 0.6, 0.6, 0)
@@ -79,6 +83,10 @@ anchor_top = 0.125
 anchor_right = 0.875
 anchor_bottom = 0.875
 
+[node name="NoScan" type="Panel" parent="ScanFrame" unique_id=1062003051]
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_gjlsf")
+
 [node name="FrameBorder" type="Panel" parent="ScanFrame" unique_id=1153535553]
 layout_mode = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_qnk50")
@@ -97,6 +105,7 @@ offset_bottom = 405.0
 grow_horizontal = 2
 grow_vertical = 2
 texture = ExtResource("3_ix88b")
+script = ExtResource("4_gjlsf")
 
 [node name="HNoticeBar" type="Panel" parent="ScanFrame/FrameBorder" unique_id=1248249997]
 layout_mode = 1
