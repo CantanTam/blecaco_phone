@@ -1,8 +1,9 @@
 [gd_scene format=3 uid="uid://cqvo2vkjgr2xx"]
 
 [ext_resource type="Script" uid="uid://dhoea37l05l40" path="res://scripts/qrcode.gd" id="1_gpbkt"]
-[ext_resource type="Shader" uid="uid://dns1acbcl5haa" path="res://resources/qrcode.gdshader" id="2_ix88b"]
+[ext_resource type="Shader" uid="uid://5lo53g6s4d8g" path="res://resources/qrcode.gdshader" id="2_ix88b"]
 [ext_resource type="Script" uid="uid://iws2m5f75rfc" path="res://addons/NativeCameraPlugin/NativeCamera.gd" id="2_sihoj"]
+[ext_resource type="Texture2D" uid="uid://bffh84mavc4ku" path="res://resources/RotateNotice.svg" id="3_ix88b"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_qnk50"]
 shader = ExtResource("2_ix88b")
@@ -14,6 +15,22 @@ border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
 border_color = Color(1, 1, 1, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_sec1p"]
+bg_color = Color(0, 0.83137256, 0, 1)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+corner_detail = 20
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_a6nh6"]
+bg_color = Color(0, 0.83137256, 0, 1)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+corner_detail = 20
 
 [node name="QRCode" type="Control" unique_id=1616750411]
 layout_mode = 3
@@ -63,6 +80,45 @@ anchor_bottom = 0.875
 [node name="FrameBorder" type="Panel" parent="ScanFrame" unique_id=1153535553]
 layout_mode = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_qnk50")
+
+[node name="RotateNotice" type="TextureRect" parent="ScanFrame/FrameBorder" unique_id=2018161997]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -405.0
+offset_top = -405.0
+offset_right = 405.0
+offset_bottom = 405.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("3_ix88b")
+
+[node name="HNoticeBar" type="Panel" parent="ScanFrame/FrameBorder" unique_id=1248249997]
+layout_mode = 1
+anchors_preset = -1
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = 10.0
+offset_bottom = 20.0
+grow_horizontal = 2
+grow_vertical = 0
+offset_transform_enabled = true
+theme_override_styles/panel = SubResource("StyleBoxFlat_sec1p")
+
+[node name="VNoticeBar" type="Panel" parent="ScanFrame/FrameBorder" unique_id=2141711454]
+layout_mode = 1
+anchors_preset = -1
+anchor_bottom = 1.0
+offset_left = -20.0
+offset_right = -10.0
+grow_horizontal = 2
+grow_vertical = 2
+offset_transform_enabled = true
+theme_override_styles/panel = SubResource("StyleBoxFlat_a6nh6")
 
 [node name="NativeCamera" type="Node" parent="." unique_id=293128046]
 script = ExtResource("2_sihoj")

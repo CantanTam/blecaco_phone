@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   version="1.1"
+   id="svg1"
+   width="400"
+   height="400"
+   viewBox="0 0 400 400"
+   sodipodi:docname="RotateNotice.svg"
+   inkscape:version="1.4.4 (dcaf3e7d9e, 2026-05-05)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs1" />
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#717171"
+     bordercolor="#999999"
+     borderopacity="1"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0"
+     inkscape:pagecheckerboard="true"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="1.4584077"
+     inkscape:cx="90.85251"
+     inkscape:cy="227.30269"
+     inkscape:window-width="2560"
+     inkscape:window-height="1354"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg1" />
+  <g
+     id="g5"
+     inkscape:label="Phone"
+     transform="matrix(0,-1.7594591,1.7594591,0,-28.918683,438.8208)">
+    <path
+       id="path1"
+       style="baseline-shift:baseline;display:inline;overflow:visible;vector-effect:none;fill:#ffffff;stroke-linecap:round;stroke-linejoin:round;paint-order:markers fill stroke;enable-background:accumulate;stop-color:#000000"
+       d="m 154.10547,58.724609 c -9.19089,0 -16.69922,7.508329 -16.69922,16.699219 V 184.79102 c 0,9.19089 7.50833,16.69921 16.69922,16.69921 h 47.3125 c 9.19089,0 16.69922,-7.50832 16.69922,-16.69921 V 75.423828 c 0,-9.19089 -7.50833,-16.699219 -16.69922,-16.699219 z m 0,7 h 47.3125 c 5.43397,0 9.69922,4.265248 9.69922,9.699219 V 184.79102 c 0,5.43397 -4.26525,9.69921 -9.69922,9.69921 h -47.3125 c -5.43397,0 -9.69922,-4.26524 -9.69922,-9.69921 V 75.423828 c 0,-5.433971 4.26525,-9.699219 9.69922,-9.699219 z m -35.91016,4.28125 C 101.96889,69.457272 88.295683,82.11371 87.482422,98.298828 l -2.779297,-3.177734 a 2.5,2.5 0 0 0 -3.529297,-0.236328 2.5,2.5 0 0 0 -0.234375,3.527343 l 6.742188,7.708981 a 2.50025,2.50025 0 0 0 3.529297,0.23633 l 7.708984,-6.742186 a 2.5,2.5 0 0 0 0.234375,-3.529296 2.5,2.5 0 0 0 -3.527344,-0.234376 l -3.15625,2.759766 C 93.117465,85.054059 104.46047,74.545234 118.02734,75.003906 a 2.5,2.5 0 0 0 2.58204,-2.414062 2.5,2.5 0 0 0 -2.41407,-2.583985 z m 53.93164,0.978516 a 3.5,3.5 0 0 0 -3.5,3.5 3.5,3.5 0 0 0 3.5,3.5 h 11.27149 a 3.5,3.5 0 0 0 3.5,-3.5 3.5,3.5 0 0 0 -3.5,-3.5 z"
+       inkscape:label="Phone_V" />
+    <path
+       id="rect2"
+       style="baseline-shift:baseline;display:inline;overflow:visible;opacity:0.35;vector-effect:none;fill:#ffffff;stroke-linecap:round;stroke-linejoin:round;paint-order:markers fill stroke;enable-background:accumulate;stop-color:#000000"
+       d="m 70.052734,120.7793 c -9.190854,0 -16.699218,7.50836 -16.699218,16.69922 v 47.3125 c 0,9.19085 7.508368,16.69921 16.699218,16.69921 h 60.248046 a 3.5,3.5 0 0 0 3.5,-3.5 3.5,3.5 0 0 0 -3.5,-3.5 H 70.052734 c -5.434009,0 -9.699218,-4.26521 -9.699218,-9.69921 v -47.3125 c 0,-5.43401 4.265212,-9.69922 9.699218,-9.69922 h 57.580076 a 3.5,3.5 0 0 0 3.5,-3.5 3.5,3.5 0 0 0 -3.5,-3.5 z m -0.939453,31.21875 a 3.5,3.5 0 0 0 -3.5,3.5 v 11.27343 a 3.5,3.5 0 0 0 3.5,3.5 3.5,3.5 0 0 0 3.5,-3.5 v -11.27343 a 3.5,3.5 0 0 0 -3.5,-3.5 z"
+       inkscape:label="Phone_H" />
+  </g>
+</svg>

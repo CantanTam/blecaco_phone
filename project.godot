@@ -32,6 +32,7 @@ enabled=PackedStringArray("res://addons/GodotAndroidPluginTemplate/plugin.cfg", 
 [input_devices]
 
 sensors/enable_accelerometer=true
+sensors/enable_gravity=true
 sensors/enable_gyroscope=true
 
 [physics]
