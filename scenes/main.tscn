@@ -6,6 +6,7 @@
 [ext_resource type="PackedScene" uid="uid://cqvo2vkjgr2xx" path="res://scenes/qrcode.tscn" id="2_sugp2"]
 [ext_resource type="PackedScene" uid="uid://dwv82d3ua535f" path="res://scenes/setting.tscn" id="4_tbgi4"]
 [ext_resource type="Script" uid="uid://t5ii3eyydvxr" path="res://scripts/record_button.gd" id="4_tefeu"]
+[ext_resource type="Script" uid="uid://dpgoiuv4le4c2" path="res://scripts/link_button.gd" id="5_a8y0u"]
 [ext_resource type="Script" uid="uid://dt4uybh6725bq" path="res://scripts/top_edge_area.gd" id="6_o6xl0"]
 [ext_resource type="Texture2D" uid="uid://bhhaqgr83jacj" path="res://resources/AddonSet.svg" id="7_eb6dy"]
 [ext_resource type="Texture2D" uid="uid://cw42vnbalgnhg" path="res://resources/ActiveCamSet.svg" id="8_a8y0u"]
@@ -16,10 +17,10 @@
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_qnk50"]
 bg_color = Color(1, 1, 1, 1)
-corner_radius_top_left = 75
-corner_radius_top_right = 75
-corner_radius_bottom_right = 75
-corner_radius_bottom_left = 75
+corner_radius_top_left = 60
+corner_radius_top_right = 60
+corner_radius_bottom_right = 60
+corner_radius_bottom_left = 60
 corner_detail = 20
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_sec1p"]
@@ -44,6 +45,30 @@ corner_radius_top_left = 52
 corner_radius_top_right = 52
 corner_radius_bottom_right = 52
 corner_radius_bottom_left = 52
+corner_detail = 20
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ypcs3"]
+bg_color = Color(0, 0, 0, 0.6313726)
+corner_radius_top_left = 60
+corner_radius_top_right = 60
+corner_radius_bottom_right = 60
+corner_radius_bottom_left = 60
+corner_detail = 20
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_trceg"]
+bg_color = Color(0, 0, 0, 0.6313726)
+corner_radius_top_left = 60
+corner_radius_top_right = 60
+corner_radius_bottom_right = 60
+corner_radius_bottom_left = 60
+corner_detail = 20
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_a8y0u"]
+bg_color = Color(0, 0, 0, 0.6313726)
+corner_radius_top_left = 60
+corner_radius_top_right = 60
+corner_radius_bottom_right = 60
+corner_radius_bottom_left = 60
 corner_detail = 20
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_e8su7"]
@@ -140,10 +165,19 @@ grow_vertical = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_6hbff")
 
 [node name="LinkButton" type="Button" parent="ModeContainer" unique_id=1954185878]
-visible = false
 layout_mode = 1
-offset_right = 8.0
-offset_bottom = 8.0
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -160.0
+offset_top = 40.0
+offset_right = -40.0
+offset_bottom = 160.0
+grow_horizontal = 0
+theme_override_styles/normal = SubResource("StyleBoxFlat_ypcs3")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_trceg")
+theme_override_styles/hover = SubResource("StyleBoxFlat_a8y0u")
+script = ExtResource("5_a8y0u")
 
 [node name="Setting" parent="ModeContainer" unique_id=2009646776 instance=ExtResource("4_tbgi4")]
 layout_mode = 1

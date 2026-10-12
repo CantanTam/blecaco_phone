@@ -16,6 +16,8 @@ var initial_connection_timer := 0.0
 var reconnect_timer := 0.0
 
 var socket := WebSocketPeer.new()
+# 是否允许发送 action 类型的 JSON
+var action_sending_enabled := true
 
 
 func _process(delta: float) -> void:
@@ -102,6 +104,16 @@ func _receive_packets() -> void:
 			text_message_received.emit(packet.get_string_from_utf8())
 		else:
 			binary_message_received.emit(packet)
+			
+			
+func set_action_sending_enabled(enabled: bool) -> void:
+	if action_sending_enabled == enabled:
+		return
+
+	action_sending_enabled = enabled
+	print("[Godot] Action JSON sending enabled: ", enabled)
+	
+	
 # json 结构
 func send_action(mode: String, data: Dictionary) -> bool:
 	var message := {
@@ -121,6 +133,13 @@ func send_setting(setting_name: String, value: Variant) -> bool:
 	return send_json(message)
 	
 func send_json(data: Dictionary) -> bool:
+	# 禁止发送 action JSON，但不影响 setting JSON
+	if (
+		data.get("type") == "action"
+		and not action_sending_enabled
+	):
+		return false
+
 	if socket.get_ready_state() != WebSocketPeer.STATE_OPEN:
 		print("[Godot] Cannot send JSON: WebSocket is not connected")
 		return false
