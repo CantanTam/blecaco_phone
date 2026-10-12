@@ -4,6 +4,8 @@
 [ext_resource type="Shader" uid="uid://5lo53g6s4d8g" path="res://resources/qrcode.gdshader" id="2_ix88b"]
 [ext_resource type="Script" uid="uid://iws2m5f75rfc" path="res://addons/NativeCameraPlugin/NativeCamera.gd" id="2_sihoj"]
 [ext_resource type="Texture2D" uid="uid://bffh84mavc4ku" path="res://resources/RotateNotice.svg" id="3_ix88b"]
+[ext_resource type="Script" uid="uid://brbsj434u0377" path="res://scripts/h_notice_bar.gd" id="4_pqttr"]
+[ext_resource type="Script" uid="uid://8eqcm5xi2kls" path="res://scripts/v_notice_bar.gd" id="5_gjlsf"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_qnk50"]
 shader = ExtResource("2_ix88b")
@@ -108,6 +110,7 @@ grow_horizontal = 2
 grow_vertical = 0
 offset_transform_enabled = true
 theme_override_styles/panel = SubResource("StyleBoxFlat_sec1p")
+script = ExtResource("4_pqttr")
 
 [node name="VNoticeBar" type="Panel" parent="ScanFrame/FrameBorder" unique_id=2141711454]
 layout_mode = 1
@@ -119,6 +122,7 @@ grow_horizontal = 2
 grow_vertical = 2
 offset_transform_enabled = true
 theme_override_styles/panel = SubResource("StyleBoxFlat_a6nh6")
+script = ExtResource("5_gjlsf")
 
 [node name="NativeCamera" type="Node" parent="." unique_id=293128046]
 script = ExtResource("2_sihoj")
