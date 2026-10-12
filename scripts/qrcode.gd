@@ -1,4 +1,3 @@
-
 extends Control
 
 signal qr_scanned(url: String)
@@ -6,11 +5,19 @@ signal qr_scanned(url: String)
 @onready var camera: NativeCamera = $NativeCamera
 @onready var preview: TextureRect = $CameraPreview
 
+# 姿态检测相关节点
+@onready var h_notice_bar = $ScanFrame/FrameBorder/HNoticeBar
+@onready var v_notice_bar = $ScanFrame/FrameBorder/VNoticeBar
+@onready var no_scan: Panel = $ScanFrame/NoScan
+
 var camera_texture: ImageTexture
 var zxing_helper
 
 var scan_timer := 0.0
 const SCAN_INTERVAL := 0.3
+
+# 姿态检测阈值
+const POSTURE_THRESHOLD := 0.966
 
 var scanning := true
 
@@ -85,10 +92,19 @@ func _on_camera_frame(frame: FrameInfo) -> void:
 
 	preview.texture = camera_texture
 
+	# 判断手机姿态是否符合扫描条件
+	var posture_ok: bool = (
+		h_notice_bar.cos_theta > POSTURE_THRESHOLD
+		and v_notice_bar.cos_beta > POSTURE_THRESHOLD
+	)
+
+	# 姿态不符合时显示遮罩，符合时隐藏遮罩
+	no_scan.visible = not posture_ok
+
 	if zxing_helper == null:
 		return
 
-	if not scanning:
+	if not scanning or not posture_ok:
 		return
 
 	scan_timer -= get_process_delta_time()
