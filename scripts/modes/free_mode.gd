@@ -1,13 +1,22 @@
 extends Node
 
 const ROTATION_SEND_INTERVAL: float = 1.0 / 100.0
+const INITIALIZE_RETRY_INTERVAL: float = 0.25
 
 var rotation_sender = preload(
-    "res://scripts/getrotation.gd"
+	"res://scripts/getrotation.gd"
 ).new()
 
 var rotation_send_timer: float = 0.0
+var initialize_retry_timer: float = 0.0
+
 var connection_node: Node = null
+
+# 手机是否已经完成初始姿态校准
+var phone_calibrated: bool = false
+
+# Blender 是否已经记录摄像机初始姿态
+var free_mode_initialized: bool = false
 
 
 func _ready() -> void:
@@ -22,16 +31,16 @@ func _ready() -> void:
 		print("[Orientation] Plugin loaded")
 	else:
 		push_error(
-            "[Orientation] Plugin singleton not found"
+			"[Orientation] Plugin singleton not found"
 		)
 
 	if connection_node == null:
 		push_error(
-            "[Orientation] Connection node not found"
+			"[Orientation] Connection node not found"
 		)
 	elif not connection_node.has_method("send_action"):
 		push_error(
-            "[Orientation] Connection.send_action() not found"
+			"[Orientation] Connection.send_action() not found"
 		)
 
 
@@ -48,6 +57,43 @@ func _process(delta: float) -> void:
 	if not connection_node.has_method("send_action"):
 		return
 
+	# 第一次进入 Free Mode 时，记录手机当前姿态
+	if not phone_calibrated:
+		if not rotation_sender.calibrate():
+			return
+
+		phone_calibrated = true
+
+		print("[Orientation] Phone orientation calibrated")
+
+	# 先通知 Blender 保存活动摄像机的初始旋转
+	# 初始化消息成功发送前，不发送手机旋转数据
+	if not free_mode_initialized:
+		initialize_retry_timer += delta
+
+		if initialize_retry_timer < INITIALIZE_RETRY_INTERVAL:
+			return
+
+		initialize_retry_timer = 0.0
+
+		var sent: bool = bool(
+			connection_node.call(
+				"send_action",
+				"free",
+				{"command": "initialize"}
+			)
+		)
+
+		if sent:
+			free_mode_initialized = true
+
+			print(
+				"[Orientation] Blender camera initialized"
+			)
+
+		return
+
+	# 初始化完成后，继续以约 100 Hz 发送手机相对旋转
 	rotation_send_timer += delta
 
 	if rotation_send_timer < ROTATION_SEND_INTERVAL:
@@ -55,12 +101,10 @@ func _process(delta: float) -> void:
 
 	rotation_send_timer = 0.0
 
-	# 获取已经转换到 Blender Camera 坐标系的四元数
 	var q: Quaternion = (
 		rotation_sender.get_rotation_quaternion()
 	)
 
-	# 发送原始精度的四元数分量
 	var quaternion_data: Dictionary = {
 		"x": q.x,
 		"y": q.y,
@@ -68,7 +112,6 @@ func _process(delta: float) -> void:
 		"w": q.w
 	}
 
-	# 通过现有 WebSocket 发送给 Blender
 	var sent: bool = bool(
 		connection_node.call(
 			"send_action",
