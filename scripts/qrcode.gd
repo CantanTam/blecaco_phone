@@ -153,16 +153,37 @@ func _on_camera_frame(frame: FrameInfo) -> void:
 
 
 func show_error() -> void:
-	# 错误二维码：保持扫码摄像头运行，继续扫描。
-	if qr_camera_stopped:
-		print(
-			"[QRCode] Camera already stopped; "
-			+ "cannot resume scanning automatically"
-		)
+	# 错误二维码 / 连接断开：回到扫码界面，重新开始扫描。
+	scanning = true
+
+	# 立刻允许下一次扫描，不沿用上一次扫描的冷却时间。
+	scan_timer = 0.0
+
+	if not qr_camera_stopped:
+		# 扫码摄像头仍在运行（连接在停止摄像头前就失败了），直接继续扫描。
+		print("[QRCode] Invalid QR, resume scanning")
 		return
 
-	scanning = true
-	print("[QRCode] Invalid QR, resume scanning")
+	# 之前为了让位给光流，扫码摄像头已经被 stop() 过，
+	# 而 _on_camera_frame 也已断开。这里必须把摄像头重新拉起来并重新订阅帧，
+	# 否则画面会停在最后一帧，扫描无法继续（表现为「卡住」）。
+	qr_camera_stopped = false
+
+	if not camera.frame_available.is_connected(
+		_on_camera_frame
+	):
+		camera.frame_available.connect(
+			_on_camera_frame
+		)
+
+	# 当前会话可能正被光流占用，先停止，再以扫码参数重新启动。
+	camera.stop()
+
+	_start_camera()
+
+	print(
+		"[QRCode] QR camera restarted, resume scanning"
+	)
 
 
 func show_connecting() -> void:
