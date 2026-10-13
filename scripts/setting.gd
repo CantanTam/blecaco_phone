@@ -14,26 +14,14 @@ const SHOWN_TOP := 0.0
 const SHOWN_BOTTOM := 190.0
 const ANIMATION_DURATION := 0.25
 
-const SETTINGS_FILE := "user://blecaco_settings.cfg"
-const MODE_SECTION := "mode"
-const MODE_KEY := "scene_path"
-const DEFAULT_MODE_SCENE := "res://scenes/modes/free_mode.tscn"
-
-const VALID_MODE_SCENE_PATHS := [
-	"res://scenes/modes/free_mode.tscn",
-	"res://scenes/modes/plane_mode.tscn",
-	"res://scenes/modes/car_mode.tscn",
-	"res://scenes/modes/game_mode.tscn",
-	"res://scenes/modes/camera_mode.tscn",
-	"res://scenes/modes/drone_mode.tscn"
-]
-
-var current_mode_scene_path: String = DEFAULT_MODE_SCENE
+var current_mode_scene_path: String = ""
 var panel_tween: Tween
 
 
 func _ready() -> void:
-	_load_saved_mode()
+	# 模式场景等用户选项统一由 Options 单例管理
+	current_mode_scene_path = Options.get_mode_scene_path()
+
 	if connection == null:
 		push_error("[Setting] 找不到 Connection 节点")
 	else:
@@ -153,7 +141,7 @@ func _on_mode_selected(scene_path: String) -> void:
 	active_mode_host.add_child(mode_instance)
 	
 	current_mode_scene_path = scene_path
-	_save_current_mode()
+	Options.set_mode_scene_path(scene_path)
 
 	for child in content_host.get_children():
 		child.queue_free()
@@ -161,55 +149,3 @@ func _on_mode_selected(scene_path: String) -> void:
 	mode_set_button.set_pressed_no_signal(false)
 
 	print("[Setting] 已切换模式：", scene_path)
-
-
-func _load_saved_mode() -> void:
-	var config := ConfigFile.new()
-	var error := config.load(SETTINGS_FILE)
-
-	if error != OK:
-		current_mode_scene_path = DEFAULT_MODE_SCENE
-
-		if error != ERR_FILE_NOT_FOUND:
-			push_warning("[Setting] 无法读取模式配置，使用 Free 模式")
-
-		return
-
-	var saved_path: String = str(
-		config.get_value(
-			MODE_SECTION,
-			MODE_KEY,
-			DEFAULT_MODE_SCENE
-		)
-	)
-
-	if (
-		VALID_MODE_SCENE_PATHS.has(saved_path)
-		and ResourceLoader.exists(saved_path)
-	):
-		current_mode_scene_path = saved_path
-	else:
-		current_mode_scene_path = DEFAULT_MODE_SCENE
-
-
-func _save_current_mode() -> void:
-	var config := ConfigFile.new()
-	var error := config.load(SETTINGS_FILE)
-
-	if error != OK and error != ERR_FILE_NOT_FOUND:
-		push_error("[Setting] 无法读取模式配置文件")
-		return
-
-	config.set_value(
-		MODE_SECTION,
-		MODE_KEY,
-		current_mode_scene_path
-	)
-
-	error = config.save(SETTINGS_FILE)
-
-	if error != OK:
-		push_error("[Setting] 保存模式失败，错误代码：" + str(error))
-		return
-
-	print("[Setting] 已保存模式：", current_mode_scene_path)

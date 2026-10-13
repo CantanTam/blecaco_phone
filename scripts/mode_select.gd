@@ -2,15 +2,7 @@ extends Control
 
 signal mode_selected(scene_path: String)
 
-const MODE_SCENES := {
-	"FreeCover": "res://scenes/modes/free_mode.tscn",
-	"PlaneCover": "res://scenes/modes/plane_mode.tscn",
-	"CarCover": "res://scenes/modes/car_mode.tscn",
-	"GameCover": "res://scenes/modes/game_mode.tscn",
-	"CameraCover": "res://scenes/modes/camera_mode.tscn",
-	"DroneCover": "res://scenes/modes/drone_mode.tscn"
-}
-
+# 模式场景清单统一由 Options 单例提供（Options.MODE_SCENES）
 const COVER_ORDER := [
 	"CameraCover",
 	"PlaneCover",
@@ -30,20 +22,27 @@ const CENTER_POP_DURATION := 0.125
 @onready var cover_flow: Control = $CoverFlow
 
 var selected_cover_name: String = "FreeCover"
-var current_mode_scene_path: String = "res://scenes/modes/free_mode.tscn"
+var current_mode_scene_path: String = ""
 var cover_animation_running: bool = false
 
 func _ready() -> void:
+	# 未由外部指定时，从 Options 取当前模式
+	if current_mode_scene_path.is_empty():
+		current_mode_scene_path = Options.get_mode_scene_path()
+
 	await get_tree().process_frame
 
-	for cover_name in MODE_SCENES:
-		if MODE_SCENES[cover_name] == current_mode_scene_path:
+	for cover_name in Options.MODE_SCENES:
+		if (
+			Options.MODE_SCENES[cover_name]
+			== current_mode_scene_path
+		):
 			selected_cover_name = cover_name
 			break
 
 	_layout_covers()
 
-	for cover_name in MODE_SCENES:
+	for cover_name in Options.MODE_SCENES:
 		var cover: Control = cover_flow.get_node_or_null(
 			cover_name
 		) as Control
@@ -65,7 +64,7 @@ func _ready() -> void:
 		cover.mouse_filter = Control.MOUSE_FILTER_STOP
 
 		cover.gui_input.connect(
-			_on_cover_gui_input.bind(MODE_SCENES[cover_name])
+			_on_cover_gui_input.bind(Options.MODE_SCENES[cover_name])
 		)
 
 
@@ -219,8 +218,8 @@ func _on_cover_gui_input(
 
 	var cover_name: String = ""
 
-	for name in MODE_SCENES:
-		if MODE_SCENES[name] == scene_path:
+	for name in Options.MODE_SCENES:
+		if Options.MODE_SCENES[name] == scene_path:
 			cover_name = name
 			break
 

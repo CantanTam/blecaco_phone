@@ -18,6 +18,10 @@ boot_splash/bg_color=Color(0.14117648, 0.14117648, 1, 1)
 boot_splash/stretch_mode=0
 config/icon="res://icon.svg"
 
+[autoload]
+
+Options="*res://scripts/options.gd"
+
 [display]
 
 window/size/viewport_width=1920
