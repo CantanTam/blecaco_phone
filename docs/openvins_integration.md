@@ -323,6 +323,48 @@ WARNING: UID duplicate detected between
    与 25 混合使用目前可正常工作（`open_vins_mobile/app` 已验证），
    但不要随意升级该版本。
 
+8. **不要把 Java 对象（如 `Context`）从 GDScript 传进 Java**
+   这是本次踩到的**最隐蔽的坑**。`AndroidContext.getContext()` 在 GDScript 里
+   看起来是一个正常的对象，但把它当参数传给
+   `OpenVINSBridge.start(Context, String)` 时，`JavaClassWrapper` 会在
+   编组阶段抛异常并**静默吞掉**。表现是：
+
+   - Java 方法体**一行日志都不打**（方法根本没被执行）；
+   - 调用返回 `null`，于是 `bool(null)` 得到 `false`；
+   - logcat 里既没有 Java 异常，也没有 native/linker 报错。
+
+   正确做法是**让 Java 侧自己解析 Context**：
+   `OpenVINSBridge.startWithConfig(String)` 内部用反射走
+   `GodotPluginRegistry.getPluginRegistry()` → `getAllPlugins()`
+   → 各插件的 `getActivity()`（与 `android_context.jar` 里同一套思路），
+   完全不跨语言边界传 Java 对象。
+   `OpenVINS.gd` 里仍保留 `start(Context, String)` 作为老版 AAR 的兜底。
+
+9. **日志刷屏会冲掉 logcat 环形缓冲区**
+   `connection.gd` 的 `send_json()` 与 `free_mode.gd` 的姿态发送都在 ~100Hz
+   打印全文，十几秒就能把 logcat 缓冲区写满，导致**最关键的启动日志
+   （`[VIO]`、`[OpenVINS]`、异常）在你回看时已经消失**——本次排查就因此
+   白绕了一圈。现已用 `VERBOSE_SEND_LOG` / `VERBOSE_ORIENTATION_LOG`
+   两个常量默认关闭；排查时把它们改回 `true`。
+   另外建议先执行 `adb logcat -G 16M` 把缓冲区扩到 16 MiB。
+
+10. **判断 VIO 到底有没有在跑：看心跳**
+    `OpenVINS.gd` 默认每秒打印一行：
+
+    ```
+    [VIO] bridge_ready=.. running=.. init=.. frames_ok=.. frames_bad=.. poses=.. last=..
+    ```
+
+    判读方式：
+    - `bridge_ready=false` → AAR 没打进 APK，或类名/包名不对；
+    - `running=false` → `start()` 失败，去看 Java 侧 `OpenVINSBridge` 标签；
+    - `frames_ok=0` → 相机没在喂帧（`feed_frame` 在 `_running` 为假时直接
+      `return`，所以此时 `frames_ok`/`frames_bad` 都会停在 0，别误判成"帧尺寸错"）；
+    - `init=false` 而 `frames_ok` 在涨 → 还在等静止初始化，属正常；
+    - `poses=0` 且 `init=true` → 检查 `getPose()` 的返回值类型。
+
+    把 `status_interval` 设为 `0` 可以关闭心跳。
+
 ---
 
 ## 10. 验收清单

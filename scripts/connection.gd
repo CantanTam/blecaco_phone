@@ -9,6 +9,10 @@ signal connection_lost
 const INITIAL_CONNECTION_TIMEOUT := 2.0
 const RECONNECT_INTERVAL := 3.0
 
+# 打开后会以 ~100Hz 打印完整 JSON，会冲掉日志缓冲区；
+# 排查问题时再改成 true。
+const VERBOSE_SEND_LOG := false
+
 var server_url := ""
 var waiting_for_initial_connection := false
 var has_connected_once := false
@@ -145,7 +149,9 @@ func send_json(data: Dictionary) -> bool:
 		return false
 
 	var message := JSON.stringify(data)
-	print("[Godot] Sending JSON: ", message)
+
+	if VERBOSE_SEND_LOG:
+		print("[Godot] Sending JSON: ", message)
 
 	var error := socket.send_text(message)
 
@@ -153,7 +159,9 @@ func send_json(data: Dictionary) -> bool:
 		print("[Godot] Failed to send JSON: ", error)
 		return false
 
-	print("[Godot] JSON queued successfully")
+	if VERBOSE_SEND_LOG:
+		print("[Godot] JSON queued successfully")
+
 	return true
 
 

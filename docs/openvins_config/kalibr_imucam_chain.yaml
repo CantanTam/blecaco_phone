@@ -1,0 +1,46 @@
+%YAML:1.0
+
+# ============================================================
+# Blecaco 相机-IMU 外参（单目）
+#
+# ⚠️ 本文件由「实测硬件探针」自动推导生成，属【未验证初值】：
+#   - 内参：直接来自设备 HAL 的 LENS_INTRINSIC_CALIBRATION
+#           [3328.806641, 3328.806396, 2040.0, 1536.0] @ 4080x3072
+#           已按 640/4080、480/3072 缩放到本文件的 resolution
+#   - 外参：由 SENSOR_ORIENTATION=90 推导（HAL 的 LENS_POSE_ROTATION
+#           经判定为「默认填充值」，不可用）
+#   - 平移：未测，暂置 0（对 VIO 的影响远小于旋转）
+#
+# 验证方式：OpenVINS 默认开启 calib_cam_extrinsics / calib_cam_intrinsics /
+#           calib_cam_timeoffset 在线优化；若估值收敛且轨迹合理，即说明
+#           该初值可用。
+#
+# 来源设备：Xiaomi Redmi 21091116AC (evergo), Android 13 (SDK 33)
+# ============================================================
+
+cam0:
+  # T_imu_cam: rotation from camera to IMU (R_CtoI), position of camera in IMU (p_CinI)
+  #
+  # 推导（SENSOR_ORIENTATION=90）：
+  #   Android 定义：输出图需「顺时针转 90°」才正立；顺时针转 90° 时
+  #   原图的最左列会成为正立图的最上行。因此：
+  #     缓冲区 u（向右）= 正立图的下方 = -Y_imu
+  #     缓冲区 v（向下）= 正立图的左方 = -X_imu
+  #     光轴（指向景物）= 从手机背面射出 = -Z_imu
+  #   R_CtoI 的三列即 [ -Y_imu, -X_imu, -Z_imu ]。
+  #
+  # ⚠️ 早期版本把 SENSOR_ORIENTATION 的旋转方向搞反，写成
+  #    [[0,1,0],[1,0,0],[0,0,-1]]（那实际是 270° 的值），
+  #    导致 VIO 初始化后位移指数发散。此处已修正。
+  T_imu_cam:
+    - [0.0, -1.0, 0.0, 0.0]
+    - [-1.0, 0.0, 0.0, 0.0]
+    - [0.0, 0.0, -1.0, 0.0]
+    - [0.0, 0.0, 0.0, 1.0]
+  camera_model: pinhole
+  distortion_model: radtan
+  distortion_coeffs: [0.0, 0.0, 0.0, 0.0]
+  intrinsics: [522.164, 520.126, 320.0, 240.0] #fu, fv, cu, cv
+  resolution: [640, 480]
+  rostopic: /cam0/image_raw
+  timeshift_cam_imu: 0.0
