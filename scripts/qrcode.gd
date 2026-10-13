@@ -20,12 +20,19 @@ const SCAN_INTERVAL := 0.3
 const POSTURE_THRESHOLD := 0.966
 
 var scanning := true
+var qr_camera_stopped := false
 
 
 func _ready() -> void:
-	camera.camera_permission_granted.connect(_on_camera_permission_granted)
-	camera.camera_permission_denied.connect(_on_camera_permission_denied)
-	camera.frame_available.connect(_on_camera_frame)
+	camera.camera_permission_granted.connect(
+		_on_camera_permission_granted
+	)
+	camera.camera_permission_denied.connect(
+		_on_camera_permission_denied
+	)
+	camera.frame_available.connect(
+		_on_camera_frame
+	)
 
 	if OS.has_feature("android"):
 		zxing_helper = JavaClassWrapper.wrap(
@@ -46,6 +53,9 @@ func _ready() -> void:
 
 
 func _start_camera() -> void:
+	if qr_camera_stopped:
+		return
+
 	var cameras := camera.get_all_cameras()
 
 	if cameras.is_empty():
@@ -60,7 +70,9 @@ func _start_camera() -> void:
 			break
 
 	var request := camera.create_feed_request()
-	request.set_camera_id(selected_camera.get_camera_id())
+	request.set_camera_id(
+		selected_camera.get_camera_id()
+	)
 	request.set_width(1280)
 	request.set_height(720)
 	request.set_scale_width(640)
@@ -69,6 +81,8 @@ func _start_camera() -> void:
 	request.set_auto_upright(true)
 
 	camera.start(request)
+
+	print("[QRCode] QR camera started")
 
 
 func _on_camera_permission_granted() -> void:
@@ -86,7 +100,9 @@ func _on_camera_frame(frame: FrameInfo) -> void:
 		return
 
 	if camera_texture == null:
-		camera_texture = ImageTexture.create_from_image(image)
+		camera_texture = ImageTexture.create_from_image(
+			image
+		)
 	else:
 		camera_texture.update(image)
 
@@ -98,7 +114,7 @@ func _on_camera_frame(frame: FrameInfo) -> void:
 		and v_notice_bar.cos_beta > POSTURE_THRESHOLD
 	)
 
-	# 姿态不符合时显示遮罩，符合时隐藏遮罩
+	# 姿态不符合时显示遮罩
 	no_scan.visible = not posture_ok
 
 	if zxing_helper == null:
@@ -128,13 +144,48 @@ func _on_camera_frame(frame: FrameInfo) -> void:
 
 	if result != "":
 		scanning = false
+
 		print("QR detected: ", result)
+
+		# 交由现有连接逻辑验证二维码。
+		# 此处不立即停止相机，因为二维码可能无效。
 		qr_scanned.emit(result)
 
 
 func show_error() -> void:
+	# 错误二维码：保持扫码摄像头运行，继续扫描。
+	if qr_camera_stopped:
+		print(
+			"[QRCode] Camera already stopped; "
+			+ "cannot resume scanning automatically"
+		)
+		return
+
 	scanning = true
+	print("[QRCode] Invalid QR, resume scanning")
 
 
 func show_connecting() -> void:
+	# 正确二维码：停止扫码。
 	scanning = false
+
+	if qr_camera_stopped:
+		return
+
+	# 先断开扫码回调，避免它接收后续光流摄像头帧。
+	if camera.frame_available.is_connected(
+		_on_camera_frame
+	):
+		camera.frame_available.disconnect(
+			_on_camera_frame
+		)
+
+	# 停止原生摄像头会话，释放给光流摄像头使用。
+	camera.stop()
+
+	qr_camera_stopped = true
+
+	print(
+		"[QRCode] QR camera stopped; "
+		+ "ready for OpticalFlowController"
+	)

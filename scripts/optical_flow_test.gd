@@ -67,6 +67,17 @@ func _on_camera_permission_denied() -> void:
 
 func _on_frame_available(info: FrameInfo) -> void:
 	frame_count += 1
+	if frame_count % 30 == 0:
+		print(
+			"[OpticalFlow] Frame callback #",
+			frame_count,
+			" | Size=",
+			info.get_width(),
+			"x",
+			info.get_height(),
+			" | Grayscale=",
+			info.is_grayscale()
+		)
 
 	var current_buffer: PackedByteArray = info.get_buffer()
 	var width: int = info.get_width()
