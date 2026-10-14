@@ -3,163 +3,133 @@ extends Node
 @onready var camera: NativeCamera = $NativeCamera
 
 # ============================================================
-# 光流运动估计：3 层金字塔 + 角点块匹配 + 鲁棒相似变换
+# 光流运动估计：3 层金字塔 + 角点块匹配 + 鲁棒相似变换（纯 GDScript）
 # ============================================================
+# 输出（与 blecaco/free_action.py 的 translation 协议一一对应）：
+#   x/y    —— 图像特征位移（像素/帧），已剔除旋转与缩放
+#   radial —— 画面扩张量（像素/帧），>0 前进、<0 后退
 #
-# 对外输出约定（与 Blender 端 blecaco/free_action.py 一一对应，
-# 不可更改）：
-#   x      —— 图像特征水平位移（像素/帧），已剔除旋转与缩放
-#   y      —— 图像特征垂直位移（像素/帧），已剔除旋转与缩放
-#   radial —— 画面整体扩张量（像素/帧），>0 前进、<0 后退
+# 旧实现的三个致命缺陷：
+#   1) 搜索半径仅 ±4px，正常持机走动每帧位移 5~20px → 长期跟丢；
+#   2) 用「块内 max-min」筛特征，排不掉只有单方向梯度的边缘（孔径问题）；
+#   3) 前进/后退靠「以画面中心做径向投影」，横向平移会污染它。
 #
-# 旧实现为什么「效果非常差」（本次逐条修复）：
-#   1. 搜索半径只有 4px。正常持机走动每帧位移常常 5~20px，
-#      一旦超出就几乎必然匹配失败 → 输出长期为 0 或随机跳变。
-#      → 改为 3 层金字塔由粗到细匹配（等效 ±18px）＋上一帧运动预测。
-#   2. 用「块内 max-min 对比度」筛特征，只能排除纯色区域，排不掉
-#      只能测出单方向位移的「边缘」（孔径问题），大量单向约束
-#      会把中位数整体拉偏。
-#      → 改为在最粗层用 Shi-Tomasi 最小特征值挑角点，并做网格均匀化。
-#   3. 取整数位移的中位数 → 亚像素抖动（±0.5px 量化噪声）。
-#      → 改为 SAD 曲面抛物线拟合，亚像素精度约 0.1px。
-#   4. 没有误匹配剔除：只要有 8 个块被接受就出结果。
-#      → 改为双向一致性校验 + 匹配代价门限 + 内点数门限。
-#   5. 分别对 dx、dy 取中位数，丢掉了两者相关性，
-#      并且完全没有区分「平移 / 旋转 / 前后」。
-#      → 改为 RANSAC + 最小二乘拟合 4 自由度相似变换
-#           u = tx + p*(x-cx) - q*(y-cy)
-#           v = ty + q*(x-cx) + p*(y-cy)
-#        · (tx, ty) = 剔除旋转/缩放后的真实平移 → x / y
-#        · p        = 膨胀率（缩放），即前进/后退 → radial
-#        · q        = 滚转（旋转）
-#   6. 旧版「径向运动」是以画面中心做投影，横向平移同样会产生
-#      很大的径向分量 → 前进/后退通道完全不可用。
-#      → 现在前进/后退直接来自相似变换的缩放项 p，与横向平移天然解耦。
+# 现方案：由粗到细块匹配 + Shi-Tomasi 角点 + 抛物线亚像素
+#         + 双向一致性校验 + RANSAC 最小二乘拟合 4 自由度相似变换
+#             u = tx + p*(x-cx) - q*(y-cy)
+#             v = ty + q*(x-cx) + p*(y-cy)
+#         tx/ty = 平移（输出 x/y），p = 膨胀率（输出 radial），q = 滚转。
+#         该模型把横向平移与前后平移天然解耦。
 #
-# 仍存在的固有局限（纯视觉无法解决，需要 IMU）：
-#   手机俯仰/偏航造成的整幅匀流与真实横向平移在数学上不可区分，
-#   只能用陀螺仪/姿态（scripts/getrotation.gd）做前馈补偿。
-#   本文件保持纯视觉、自包含，IMU 融合留作后续独立步骤。
+# 固有局限：俯仰/偏航造成的整幅匀流与真实横向平移数学上不可区分，
+#           纯视觉无法分离，需 IMU 做前馈（scripts/getrotation.gd）。
 # ============================================================
 
 # ---------------- 金字塔 ----------------
-# L0 = 原始（320x240），L1 = 1/2，L2 = 1/4
-const PYRAMID_LEVELS: int = 3
-const COARSE_LEVEL: int = 2
-const DETECT_LEVEL: int = 2
+# L0 = 原始(320x240)，L1 = 1/2，L2 = 1/4
+const PYRAMID_LEVELS := 3
+const COARSE_LEVEL := 2
+const DETECT_LEVEL := 2
 
 # ---------------- 块匹配 ----------------
-# 索引即层级：0 = L0，1 = L1，2 = L2
-const BLOCK_RADII := [2, 1, 1]
-const SEARCH_RADII := [2, 2, 3]
-# 最粗层先用大步长扫一遍再精化，可省掉约 40% 的匹配代价
-const COARSE_STEP_LEVEL2: int = 2
+# 数组下标即层级：0 = L0，1 = L1，2 = L2
+const BLOCK_RADII := [2, 1, 1]      # 匹配块半径（5x5 / 3x3 / 3x3）
+const SEARCH_RADII := [2, 2, 3]     # 搜索半径
+const COARSE_STEP := 2              # 最粗层先用大步长粗扫，再逐像素精化
 
 # ---------------- 特征点 ----------------
-const MAX_FEATURES: int = 36
-const FEATURE_CELL: int = 8          # 检测层上每个网格只保留一个最强角点
-const SHI_TOMASI_MIN_RATIO: float = 0.02
-const FEATURE_MARGIN: int = 5        # 检测层的边界余量
+const MAX_FEATURES := 36            # 特征点数上限
+const FEATURE_CELL := 8            # 检测层网格边长（非极大值抑制 + 分布均匀化）
+const SHI_TOMASI_RATIO := 0.02      # 最小特征值门限（相对最强响应）
+const FEATURE_MARGIN := 5           # 检测层边界余量
 
 # ---------------- 校验 ----------------
-const MAX_MEAN_ABS_DIFF: float = 40.0  # 单点接受门限（每像素平均绝对差）
-const FB_MAX_ERROR: float = 1.0        # 双向一致性误差（L0 像素）
-const RANSAC_ITERATIONS: int = 48
-const RANSAC_INLIER_DIST: float = 1.2
-const RANSAC_MIN_BASELINE: float = 16.0
-const MIN_INLIERS: int = 8
-const MAX_FLOW_PX: float = 60.0        # 单帧位移上限，超出判为异常
+const MAX_MEAN_ABS_DIFF := 40.0     # 单点匹配代价上限（每像素平均绝对差）
+const FB_MAX_ERROR := 1.0           # 双向一致性误差上限（L0 像素）
+const RANSAC_ITERATIONS := 48
+const RANSAC_INLIER_DIST := 1.2
+const RANSAC_MIN_BASELINE := 16.0
+const MIN_INLIERS := 8
+const MAX_FLOW_PX := 60.0           # 单帧位移/膨胀上限，超出判为异常
 
 # ---------------- 时间滤波 ----------------
-const FLOW_SMOOTHING_ALPHA: float = 0.35
-const FLOW_DEADZONE_PX: float = 0.3
-const LOST_DECAY: float = 0.5
+const FLOW_SMOOTHING_ALPHA := 0.35  # 平滑系数（按内点数自适应）
+const FLOW_DEADZONE_PX := 0.3       # 死区，静止时不出噪声
+const LOST_DECAY := 0.5             # 跟丢后向 0 衰减的速度
 
 # ---------------- 调试 ----------------
-const DEBUG_FLOW_LOG: bool = false
-const DEBUG_FLOW_INTERVAL: int = 30
+const DEBUG_FLOW_LOG := false
+const DEBUG_FLOW_INTERVAL := 30
 
 # ============================================================
-# 光流后台工作线程
+# 状态
 # ============================================================
 
-var _flow_thread: Thread = Thread.new()
-var _flow_mutex: Mutex = Mutex.new()
-var _flow_semaphore: Semaphore = Semaphore.new()
+# 主线程 ←→ 工作线程
+var _flow_thread := Thread.new()
+var _flow_mutex := Mutex.new()
+var _flow_semaphore := Semaphore.new()
+var _flow_thread_running := false
+var _flow_wakeup_pending := false
 
-var _flow_thread_running: bool = false
+var _latest_frame := PackedByteArray()
+var _latest_width := 0
+var _latest_height := 0
 
-# 最新待处理的摄像头帧
-var _latest_frame: PackedByteArray = PackedByteArray()
-var _latest_width: int = 0
-var _latest_height: int = 0
+# 工作线程私有
+var _worker_previous_buffer := PackedByteArray()
+var _worker_previous_width := 0
+var _worker_previous_height := 0
+var _worker_frame_count := 0
 
-# 是否已经通知工作线程有新帧
-var _flow_wakeup_pending: bool = false
+# 工作线程结果 → 主线程
+var _flow_result := Vector2.ZERO
+var _flow_radial_result := 0.0
+var _flow_match_result := 0
+var _flow_result_valid := false
+var _flow_result_ready := false
 
-# 由工作线程维护的参考帧
-var _worker_previous_buffer: PackedByteArray = PackedByteArray()
-var _worker_previous_width: int = 0
-var _worker_previous_height: int = 0
+# 上一帧模型：|预测下一帧位移用|（仅工作线程访问）
+var _has_model := false
+var _model_tx := 0.0
+var _model_ty := 0.0
+var _model_p := 0.0
+var _model_q := 0.0
 
-# 工作线程计算的最新结果
-var _flow_result: Vector2 = Vector2.ZERO
-var _flow_radial_result: float = 0.0
-var _flow_match_result: int = 0
-var _flow_result_valid: bool = false
-var _flow_result_ready: bool = false
-
-# 光流平滑状态
-var _smoothed_motion: Vector2 = Vector2.ZERO
-var _smoothed_radial_motion: float = 0.0
-var _has_smoothed_motion: bool = false
-
-# 工作线程内部的上一帧模型（仅工作线程访问，无需加锁）
-var _has_model: bool = false
-var _model_tx: float = 0.0
-var _model_ty: float = 0.0
-var _model_p: float = 0.0
-var _model_q: float = 0.0
-
-var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
-
-var _worker_frame_count: int = 0
-
-# 工作线程缓存：上一帧的金字塔。
-# 因为 work_previous = 上一轮的 current，所以每次只需重建一套金字塔。
+# 上一帧金字塔缓存（工作线程的 previous 就是上一轮的 current，可复用）
 var _worker_prev_pyramid: Array[PackedByteArray] = []
-var _worker_prev_pyramid_ready: bool = false
+var _worker_prev_pyramid_ready := false
 
-# 工作线程统计量（调试用）
-var last_match_count: int = 0
-var last_radial_motion: float = 0.0
-var last_rotation: float = 0.0
-var last_expansion: float = 0.0
+# 时间滤波
+var _smoothed_motion := Vector2.ZERO
+var _smoothed_radial_motion := 0.0
+var _has_smoothed_motion := false
+
+var _rng := RandomNumberGenerator.new()
+
+# RANSAC 的 4 维基向量（复用，避免每行都分配数组）
+var _basis := PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
+
+# 遥测（供远程调试器查看，兼容旧版字段名）
+var last_match_count := 0
+var last_radial_motion := 0.0
+var last_rotation := 0.0
+var last_expansion := 0.0
 
 var connection_node: Node = null
 
 
 func _ready() -> void:
-	# 查找现有的 Connection 节点
-	connection_node = get_tree().root.find_child(
-		"Connection",
-		true,
-		false
-	)
+	connection_node = get_tree().root.find_child("Connection", true, false)
 
 	if connection_node == null:
-		push_error(
-			"[OpticalFlow] Connection 节点不存在"
-		)
+		push_error("[OpticalFlow] Connection 节点不存在")
 	elif not connection_node.has_method("send_action"):
-		push_error(
-			"[OpticalFlow] Connection.send_action() 不存在"
-		)
+		push_error("[OpticalFlow] Connection.send_action() 不存在")
 		connection_node = null
 
 	_rng.randomize()
 
-	# 配置 NativeCamera
 	camera.frame_width = 320
 	camera.frame_height = 240
 	camera.frames_to_skip = 0
@@ -170,22 +140,13 @@ func _ready() -> void:
 
 	camera.frame_available.connect(_on_frame_available)
 	camera.camera_permission_granted.connect(_start_camera)
-	camera.camera_permission_denied.connect(
-		_on_camera_permission_denied
-	)
+	camera.camera_permission_denied.connect(_on_camera_permission_denied)
 
-	# 启动光流工作线程
 	_flow_thread_running = true
 
-	var thread_error: Error = _flow_thread.start(
-		_flow_worker
-	)
-
-	if thread_error != OK:
+	if _flow_thread.start(_flow_worker) != OK:
 		_flow_thread_running = false
-		push_error(
-			"[OpticalFlow] 无法启动后台线程"
-		)
+		push_error("[OpticalFlow] 无法启动后台线程")
 		return
 
 	if camera.has_camera_permission():
@@ -229,17 +190,17 @@ func _on_frame_available(info: FrameInfo) -> void:
 	if not info.is_grayscale():
 		return
 
-	var current_buffer: PackedByteArray = info.get_buffer()
-	var width: int = info.get_width()
-	var height: int = info.get_height()
+	var current_buffer := info.get_buffer()
+	var width := info.get_width()
+	var height := info.get_height()
 
 	if current_buffer.size() != width * height:
 		return
 
-	# 在主线程复制最新图像。
-	# 后台线程不直接访问 NativeCamera。
-	var frame_copy: PackedByteArray = current_buffer.duplicate()
-	var should_wake_worker: bool = false
+	# 在主线程复制最新图像（后台线程不访问 NativeCamera）。
+	# 只保留最新帧，不积压旧帧。
+	var frame_copy := current_buffer.duplicate()
+	var should_wake_worker := false
 
 	_flow_mutex.lock()
 
@@ -247,12 +208,10 @@ func _on_frame_available(info: FrameInfo) -> void:
 		_flow_mutex.unlock()
 		return
 
-	# 只保留最新图像，不积压旧帧。
 	_latest_frame = frame_copy
 	_latest_width = width
 	_latest_height = height
 
-	# 已经有唤醒信号时，不重复提交信号。
 	if not _flow_wakeup_pending:
 		_flow_wakeup_pending = true
 		should_wake_worker = true
@@ -264,13 +223,13 @@ func _on_frame_available(info: FrameInfo) -> void:
 
 
 func _process(_delta: float) -> void:
-	var has_result: bool = false
-	var valid: bool = false
-	var motion: Vector2 = Vector2.ZERO
-	var radial: float = 0.0
-	var inliers: int = 0
+	var has_result := false
+	var valid := false
+	var motion := Vector2.ZERO
+	var radial := 0.0
+	var inliers := 0
 
-	# 从后台线程取得最新光流结果
+	# 从后台线程取最新结果
 	_flow_mutex.lock()
 
 	if _flow_result_ready:
@@ -286,73 +245,34 @@ func _process(_delta: float) -> void:
 	if not has_result:
 		return
 
-	# 跟踪失败（内点不足 / 场景无纹理）：向 0 衰减，
-	# 避免把最后一段错误速度一直发出去，同时让相机平滑停住。
 	if not valid:
+		# 跟踪失败（内点不足 / 场景无纹理）：向 0 衰减，
+		# 避免把最后一段错误速度一直发出去，同时让相机平滑停住。
 		_smoothed_motion *= LOST_DECAY
 		_smoothed_radial_motion *= LOST_DECAY
-		_apply_deadzone(_smoothed_motion, _smoothed_radial_motion)
-		_send_translation(
-			_smoothed_motion,
-			_smoothed_radial_motion
-		)
-		return
-
-	if not _has_smoothed_motion:
+	elif not _has_smoothed_motion:
 		# 第一次拿到结果时直接采用，避免启动时缓慢爬升
 		_smoothed_motion = motion
 		_smoothed_radial_motion = radial
 		_has_smoothed_motion = true
 	else:
-		# 内点越多，说明本帧越可信，允许更快的跟随速度
-		var quality: float = clampf(
-			float(inliers) / float(maxi(MIN_INLIERS, 1)),
-			0.3,
-			1.5
-		)
-		var alpha: float = clampf(
-			FLOW_SMOOTHING_ALPHA * quality,
-			0.08,
-			0.6
-		)
-		_smoothed_motion = _smoothed_motion.lerp(
-			motion,
-			alpha
-		)
-		_smoothed_radial_motion = lerpf(
-			_smoothed_radial_motion,
-			radial,
-			alpha
-		)
+		# 内点越多说明本帧越可信，允许更快的跟随速度
+		var quality := clampf(float(inliers) / float(MIN_INLIERS), 0.3, 1.5)
+		var alpha := clampf(FLOW_SMOOTHING_ALPHA * quality, 0.08, 0.6)
 
-	_apply_deadzone(
-		_smoothed_motion,
-		_smoothed_radial_motion
-	)
+		_smoothed_motion = _smoothed_motion.lerp(motion, alpha)
+		_smoothed_radial_motion = lerpf(_smoothed_radial_motion, radial, alpha)
 
-	# 仍然在主线程向 Blender 发送数据
-	_send_translation(
-		_smoothed_motion,
-		_smoothed_radial_motion
-	)
+	# 死区：小于门限的残余抖动直接归零
+	_smoothed_motion.x = _deadzone(_smoothed_motion.x)
+	_smoothed_motion.y = _deadzone(_smoothed_motion.y)
+	_smoothed_radial_motion = _deadzone(_smoothed_radial_motion)
+
+	_send_translation(_smoothed_motion, _smoothed_radial_motion)
 
 
-# 死区：小于门限的残余抖动直接归零，静止时不发送噪声。
-func _apply_deadzone(
-	motion: Vector2,
-	radial: float
-) -> void:
-	_smoothed_motion = motion
-	_smoothed_radial_motion = radial
-
-	if absf(_smoothed_motion.x) < FLOW_DEADZONE_PX:
-		_smoothed_motion.x = 0.0
-
-	if absf(_smoothed_motion.y) < FLOW_DEADZONE_PX:
-		_smoothed_motion.y = 0.0
-
-	if absf(_smoothed_radial_motion) < FLOW_DEADZONE_PX:
-		_smoothed_radial_motion = 0.0
+func _deadzone(value: float) -> float:
+	return 0.0 if absf(value) < FLOW_DEADZONE_PX else value
 
 
 func _send_translation(motion: Vector2, radial: float) -> void:
@@ -365,43 +285,31 @@ func _send_translation(motion: Vector2, radial: float) -> void:
 	if not connection_node.has_method("send_action"):
 		return
 
-	var translation_data: Dictionary = {
+	connection_node.call("send_action", "free", {
 		"command": "translation",
 		"x": motion.x,
 		"y": motion.y,
 		"radial": radial
-	}
-
-	connection_node.call(
-		"send_action",
-		"free",
-		translation_data
-	)
+	})
 
 
 # ============================================================
-# 后台光流工作线程
+# 后台工作线程
 # ============================================================
 
 func _flow_worker() -> void:
 	while true:
-		# 等待主线程提交新帧
 		_flow_semaphore.wait()
 
-		var frame: PackedByteArray
-		var width: int
-		var height: int
-
-		# 取得最新帧，然后释放锁，让主线程继续运行
 		_flow_mutex.lock()
 
 		if not _flow_thread_running:
 			_flow_mutex.unlock()
 			break
 
-		frame = _latest_frame
-		width = _latest_width
-		height = _latest_height
+		var frame := _latest_frame
+		var width := _latest_width
+		var height := _latest_height
 
 		_flow_wakeup_pending = false
 
@@ -410,12 +318,10 @@ func _flow_worker() -> void:
 		if frame.is_empty() or width <= 0 or height <= 0:
 			continue
 
-		# 首帧或图像尺寸发生变化时，只更新参考帧并复位运动模型
-		if (
-			_worker_previous_buffer.is_empty()
-			or _worker_previous_width != width
-			or _worker_previous_height != height
-		):
+		# 首帧或尺寸变化：只记参考帧，并复位模型与金字塔缓存
+		if (_worker_previous_buffer.is_empty()
+				or _worker_previous_width != width
+				or _worker_previous_height != height):
 			_worker_previous_buffer = frame
 			_worker_previous_width = width
 			_worker_previous_height = height
@@ -423,16 +329,8 @@ func _flow_worker() -> void:
 			_worker_prev_pyramid_ready = false
 			continue
 
-		# 在后台线程中进行光流计算
-		var result: Dictionary = _estimate_motion(
-			_worker_previous_buffer,
-			frame,
-			width,
-			height,
-			true
-		)
+		var result := _estimate_motion(_worker_previous_buffer, frame, width, height, true)
 
-		# 保留本次计算的参考帧
 		_worker_previous_buffer = frame
 		_worker_previous_width = width
 		_worker_previous_height = height
@@ -459,7 +357,6 @@ func _flow_worker() -> void:
 				" rms=", snappedf(float(result["rms"]), 0.01)
 			)
 
-		# 将结果交给主线程
 		_flow_mutex.lock()
 
 		_flow_result = Vector2(result["motion"])
@@ -472,7 +369,7 @@ func _flow_worker() -> void:
 
 
 # ============================================================
-# 单帧运动估计主流程
+# 单帧运动估计
 # ============================================================
 
 func _estimate_motion(
@@ -480,7 +377,7 @@ func _estimate_motion(
 	current: PackedByteArray,
 	width: int,
 	height: int,
-	reuse_previous_pyramid: bool = false
+	reuse_previous_pyramid := false
 ) -> Dictionary:
 	if width < 32 or height < 32:
 		return _invalid_result()
@@ -492,84 +389,62 @@ func _estimate_motion(
 	else:
 		prev_pyr = _build_pyramid(previous, width, height)
 
-	var curr_pyr: Array[PackedByteArray] = _build_pyramid(
-		current,
-		width,
-		height
-	)
+	var curr_pyr := _build_pyramid(current, width, height)
+	var dims := _pyramid_dims(width, height)
 
-	# 下一轮的 previous 就是本轮的 current，直接复用。
+	# 下一轮的 previous 就是本轮的 current，直接复用
 	_worker_prev_pyramid = curr_pyr
 	_worker_prev_pyramid_ready = true
 
-	var dims: Array[Vector2i] = _pyramid_dims(width, height)
-
 	var detect_dims: Vector2i = dims[DETECT_LEVEL]
-	var candidates: Array[Vector2] = _detect_features(
-		prev_pyr[DETECT_LEVEL],
-		detect_dims.x,
-		detect_dims.y
-	)
+	var candidates := _detect_features(prev_pyr[DETECT_LEVEL], detect_dims.x, detect_dims.y)
 
 	if candidates.size() < MIN_INLIERS:
 		return _invalid_result()
 
 	var center := Vector2(width * 0.5, height * 0.5)
 	var detect_scale := float(1 << DETECT_LEVEL)
-
-	var l0_radius: int = int(BLOCK_RADII[0])
-	var l0_block_area: float = float(
-		(2 * l0_radius + 1) * (2 * l0_radius + 1)
-	)
+	var l0_radius := int(BLOCK_RADII[0])
+	var l0_area := float((2 * l0_radius + 1) * (2 * l0_radius + 1))
+	var l0_w := dims[0].x
+	var l0_h := dims[0].y
 
 	var src: Array[Vector2] = []
 	var flow: Array[Vector2] = []
-	var fb_rejected: int = 0
+	var fb_rejected := 0
 
 	for candidate in candidates:
 		var p0: Vector2 = candidate * detect_scale
 
-		# 用上一帧模型预测本帧位移。
-		# 预测越准，金字塔要覆盖的搜索范围就越小、越不容易跟丢。
-		var predict := Vector2.ZERO
-		if _has_model:
-			predict = _predict_flow(p0, center)
+		# 用上一帧模型预测本帧位移：预测越准，金字塔要覆盖的范围越小
+		var predict := _predict_flow(p0, center) if _has_model else Vector2.ZERO
+		var disp := _track_l0(prev_pyr, curr_pyr, dims, p0, predict)
 
-		var disp: Vector2 = _track_l0(
-			prev_pyr,
-			curr_pyr,
-			dims,
-			p0,
-			predict
-		)
+		# 代价门限。
+		# _sad() 是零边界检查的热路径，所以这里必须先证明
+		# 「参考块 + 目标块都完整落在图像内」，否则直接判为跟丢。
+		var src_x := roundi(p0.x)
+		var src_y := roundi(p0.y)
+		var dx := roundi(p0.x + disp.x) - src_x
+		var dy := roundi(p0.y + disp.y) - src_y
 
-		# L0 匹配代价门限：无纹理区域 / 误匹配直接丢弃
-		var cost := _sad(
-			prev_pyr[0],
-			curr_pyr[0],
-			dims[0].x,
-			roundi(p0.x),
-			roundi(p0.y),
-			roundi(disp.x),
-			roundi(disp.y),
-			l0_radius
-		)
+		if (src_x < l0_radius or src_x > l0_w - 1 - l0_radius
+				or src_y < l0_radius or src_y > l0_h - 1 - l0_radius
+				or dx < l0_radius - src_x or dx > l0_w - 1 - l0_radius - src_x
+				or dy < l0_radius - src_y or dy > l0_h - 1 - l0_radius - src_y):
+			fb_rejected += 1
+			continue
 
-		if float(cost) / l0_block_area > MAX_MEAN_ABS_DIFF:
+		var cost := _sad(prev_pyr[0], curr_pyr[0], l0_w, src_x, src_y, dx, dy, l0_radius)
+
+		if float(cost) / l0_area > MAX_MEAN_ABS_DIFF:
 			continue
 
 		# 双向一致性校验：倒过来再跟一次，往返误差必须很小
-		var q0: Vector2 = p0 + disp
-		var back: Vector2 = _match_at_level(
-			curr_pyr[0],
-			prev_pyr[0],
-			dims[0].x,
-			dims[0].y,
-			q0,
-			-disp,
-			int(SEARCH_RADII[0]),
-			l0_radius,
-			1
+		var q0 := p0 + disp
+		var back := _match_at_level(
+			curr_pyr[0], prev_pyr[0], l0_w, l0_h,
+			q0, -disp, int(SEARCH_RADII[0]), l0_radius, 1
 		)
 
 		if (disp + back).length() > FB_MAX_ERROR:
@@ -582,44 +457,46 @@ func _estimate_motion(
 	if src.size() < MIN_INLIERS:
 		return _invalid_result()
 
-	var model: Dictionary = _fit_similarity(src, flow, center)
+	var model := _fit_similarity(src, flow, center)
 
 	if not model["valid"]:
 		return _invalid_result()
 
 	var motion := Vector2(float(model["tx"]), float(model["ty"]))
 	var expansion := float(model["p_exp"])
+	var rotation := float(model["q_rot"])
 
-	# 异常帧拒收：位移或膨胀量远超物理合理范围
+	# 异常帧拒收：平移 / 膨胀 / 滚转远超物理合理范围时整帧作废
 	if motion.length() > MAX_FLOW_PX:
 		return _invalid_result()
 
 	if absf(expansion) * center.x > MAX_FLOW_PX:
 		return _invalid_result()
 
-	# 把「膨胀率」折算成与旧版一致的像素/帧量纲：
-	# 半径 R 处的径向位移 ≈ p * R，因此取特征点的平均半径。
+	if absf(rotation) * center.x > MAX_FLOW_PX:
+		return _invalid_result()
+
+	# 把膨胀率折算成与旧版一致的像素/帧量纲：
+	# 半径 R 处的径向位移 ≈ p * R，取特征点的平均半径。
 	var radius_sum := 0.0
+
 	for point in src:
 		radius_sum += (point - center).length()
-
-	var mean_radius := radius_sum / float(src.size())
-	var radial := expansion * mean_radius
 
 	_has_model = true
 	_model_tx = motion.x
 	_model_ty = motion.y
 	_model_p = expansion
-	_model_q = float(model["q_rot"])
+	_model_q = rotation
 
 	return {
 		"valid": true,
 		"motion": motion,
-		"radial": radial,
+		"radial": expansion * radius_sum / float(src.size()),
 		"inliers": int(model["inliers"]),
 		"features": src.size(),
 		"fb_rejected": fb_rejected,
-		"rotation": float(model["q_rot"]),
+		"rotation": rotation,
 		"expansion": expansion,
 		"rms": float(model["rms"])
 	}
@@ -640,7 +517,7 @@ func _invalid_result() -> Dictionary:
 
 
 # ============================================================
-# 图像金字塔
+# 金字塔
 # ============================================================
 
 func _pyramid_dims(width: int, height: int) -> Array[Vector2i]:
@@ -656,16 +533,10 @@ func _pyramid_dims(width: int, height: int) -> Array[Vector2i]:
 	return dims
 
 
-# 2x2 均值下采样构成金字塔。PackedByteArray 只读共享，不做额外拷贝。
-func _build_pyramid(
-	source: PackedByteArray,
-	width: int,
-	height: int
-) -> Array[PackedByteArray]:
-	var levels: Array[PackedByteArray] = []
-	levels.append(source)
-
-	var src: PackedByteArray = source
+# 2x2 均值下采样。PackedByteArray 只读共享，不额外拷贝。
+func _build_pyramid(source: PackedByteArray, width: int, height: int) -> Array[PackedByteArray]:
+	var levels: Array[PackedByteArray] = [source]
+	var src := source
 	var w := width
 	var h := height
 
@@ -687,10 +558,8 @@ func _build_pyramid(
 				var sx1 := mini(sx0 + 1, w - 1)
 
 				dst[dst_row + x] = (
-					int(src[row0 + sx0])
-					+ int(src[row0 + sx1])
-					+ int(src[row1 + sx0])
-					+ int(src[row1 + sx1])
+					int(src[row0 + sx0]) + int(src[row0 + sx1])
+					+ int(src[row1 + sx0]) + int(src[row1 + sx1])
 				) >> 2
 
 		levels.append(dst)
@@ -702,27 +571,19 @@ func _build_pyramid(
 
 
 # ============================================================
-# 特征点检测：Shi-Tomasi 最小特征值 + 网格非极大值抑制
+# 角点检测：Shi-Tomasi 最小特征值 + 网格非极大值抑制
 # ============================================================
 
-func _detect_features(
-	image: PackedByteArray,
-	width: int,
-	height: int
-) -> Array[Vector2]:
+func _detect_features(image: PackedByteArray, width: int, height: int) -> Array[Vector2]:
 	var features: Array[Vector2] = []
 
-	if width < FEATURE_MARGIN * 2 + 4:
-		return features
-
-	if height < FEATURE_MARGIN * 2 + 4:
+	if width < FEATURE_MARGIN * 2 + 4 or height < FEATURE_MARGIN * 2 + 4:
 		return features
 
 	# 第一遍：Sobel 梯度 → 结构张量分量
 	var gxx := PackedFloat32Array()
 	var gyy := PackedFloat32Array()
 	var gxy := PackedFloat32Array()
-
 	gxx.resize(width * height)
 	gyy.resize(width * height)
 	gxy.resize(width * height)
@@ -732,7 +593,6 @@ func _detect_features(
 
 		for x in range(1, width - 1):
 			var i := row + x
-
 			var a := int(image[i - width - 1])
 			var b := int(image[i - width])
 			var c := int(image[i - width + 1])
@@ -741,7 +601,6 @@ func _detect_features(
 			var g := int(image[i + width - 1])
 			var hh := int(image[i + width])
 			var k := int(image[i + width + 1])
-
 			var gx := float((c + 2 * f + k) - (a + 2 * d + g))
 			var gy := float((g + 2 * hh + k) - (a + 2 * b + c))
 
@@ -749,7 +608,7 @@ func _detect_features(
 			gyy[i] = gy * gy
 			gxy[i] = gx * gy
 
-	# 第二遍：3x3 窗口聚合 → 最小特征值 λmin（Shi-Tomasi）
+	# 第二遍：3x3 窗口聚合 → 最小特征值 λmin
 	var responses := PackedFloat32Array()
 	responses.resize(width * height)
 
@@ -772,10 +631,7 @@ func _detect_features(
 				sxy += gxy[r - 1] + gxy[r] + gxy[r + 1]
 
 			var diff := sxx - syy
-			var lambda_min := 0.5 * (
-				sxx + syy
-				- sqrt(diff * diff + 4.0 * sxy * sxy)
-			)
+			var lambda_min := 0.5 * (sxx + syy - sqrt(diff * diff + 4.0 * sxy * sxy))
 
 			responses[row + x] = lambda_min
 
@@ -785,21 +641,19 @@ func _detect_features(
 	if max_response <= 0.0:
 		return features
 
-	var threshold := max_response * SHI_TOMASI_MIN_RATIO
+	var threshold := max_response * SHI_TOMASI_RATIO
 
-	# 第三遍：网格内取最强角点。既做非极大值抑制，又让特征分布均匀。
+	# 第三遍：网格内取最强角点（既做非极大值抑制，又让分布均匀）
 	var picks: Array[Vector3] = []
 	var cells_x := int(width / FEATURE_CELL)
 	var cells_y := int(height / FEATURE_CELL)
 
 	for cy in cells_y:
 		for cx in cells_x:
-			var x0 := cx * FEATURE_CELL
-			var y0 := cy * FEATURE_CELL
-			var xs := maxi(x0, margin)
-			var ys := maxi(y0, margin)
-			var xe := mini(x0 + FEATURE_CELL, width - margin)
-			var ye := mini(y0 + FEATURE_CELL, height - margin)
+			var xs := maxi(cx * FEATURE_CELL, margin)
+			var ys := maxi(cy * FEATURE_CELL, margin)
+			var xe := mini((cx + 1) * FEATURE_CELL, width - margin)
+			var ye := mini((cy + 1) * FEATURE_CELL, height - margin)
 
 			var best_value := 0.0
 			var best_x := -1
@@ -817,12 +671,10 @@ func _detect_features(
 						best_y = y
 
 			if best_x >= 0 and best_value >= threshold:
-				picks.append(
-					Vector3(float(best_x), float(best_y), best_value)
-				)
+				picks.append(Vector3(float(best_x), float(best_y), best_value))
 
 	if picks.size() > MAX_FEATURES:
-		picks.sort_custom(_sort_by_response_desc)
+		picks.sort_custom(func(a: Vector3, b: Vector3) -> bool: return a.z > b.z)
 
 	for pick in picks:
 		if features.size() >= MAX_FEATURES:
@@ -833,36 +685,23 @@ func _detect_features(
 	return features
 
 
-func _sort_by_response_desc(a: Vector3, b: Vector3) -> bool:
-	return a.z > b.z
-
-
 # ============================================================
 # SAD 块匹配
 # ============================================================
 
-# 热路径：内部完全不做边界检查。
-# 调用方（_match_at_level）必须保证参考块中心 (cx, cy) 与
-# 目标块中心 (cx+dx, cy+dy) 都满足「块完整落在图像内」。
+# 热路径：内部**不做任何边界检查**。
+# 调用方必须保证参考块 (cx,cy) 与目标块 (cx+dx,cy+dy) 都完整落在图像内。
 func _sad(
-	ref_img: PackedByteArray,
-	tgt_img: PackedByteArray,
-	width: int,
-	cx: int,
-	cy: int,
-	dx: int,
-	dy: int,
-	block_radius: int
+	ref_img: PackedByteArray, tgt_img: PackedByteArray,
+	width: int, cx: int, cy: int, dx: int, dy: int, block_radius: int
 ) -> int:
 	var cost := 0
-	var row_span := 2 * block_radius
+	var span := 2 * block_radius
 
 	for py in range(-block_radius, block_radius + 1):
 		var ref_index := (cy + py) * width + cx - block_radius
-		var tgt_index := (
-			(cy + py + dy) * width + cx - block_radius + dx
-		)
-		var end_index := ref_index + row_span
+		var tgt_index := (cy + py + dy) * width + cx - block_radius + dx
+		var end_index := ref_index + span
 
 		while ref_index <= end_index:
 			cost += absi(ref_img[ref_index] - tgt_img[tgt_index])
@@ -872,57 +711,55 @@ func _sad(
 	return cost
 
 
-# 在金字塔某一层做块匹配（含大步长粗扫 + 亚像素精化）。
+# 把位移夹到「目标块完整落在图像内」的范围。
+# 两个端点随 cx/cy 同向平移，所以 min <= max 恒成立，不需要额外判空。
+func _clamp_disp(
+	disp: Vector2, cx: int, cy: int, width: int, height: int, radius: int
+) -> Vector2:
+	return Vector2(
+		clampf(disp.x, float(radius - cx), float(width - 1 - radius - cx)),
+		clampf(disp.y, float(radius - cy), float(height - 1 - radius - cy))
+	)
+
+
+# 在金字塔某一层做块匹配（粗扫 + 逐像素精扫 + 亚像素抛物线）。
 #   p     : 参考块中心（本层坐标）
 #   guess : 初始位移估计（本层坐标）
-#   返回   : 目标块相对于参考块的位移（含亚像素）
+#   返回   : 目标块相对参考块的位移，**保证目标块不越界**
 func _match_at_level(
-	ref_img: PackedByteArray,
-	tgt_img: PackedByteArray,
-	width: int,
-	height: int,
-	p: Vector2,
-	guess: Vector2,
-	search_radius: int,
-	block_radius: int,
-	coarse_step: int
+	ref_img: PackedByteArray, tgt_img: PackedByteArray,
+	width: int, height: int,
+	p: Vector2, guess: Vector2,
+	search_radius: int, block_radius: int, coarse_step: int
 ) -> Vector2:
 	var cx := roundi(p.x)
 	var cy := roundi(p.y)
+	var safe_guess := _clamp_disp(guess, cx, cy, width, height, block_radius)
 
-	# 参考块越界：不精化，直接返回预测值
-	if (
-		cx < block_radius
-		or cx > width - 1 - block_radius
-		or cy < block_radius
-		or cy > height - 1 - block_radius
-	):
-		return guess
+	# 参考块越界 → 不精化，返回夹紧后的预测值。
+	# 【必须夹紧】：未裁剪的预测值会被 _track_l0 逐层放大，
+	# 最终让调用方的 _sad() 越界读取（旧版崩溃点）。
+	if (cx < block_radius or cx > width - 1 - block_radius
+			or cy < block_radius or cy > height - 1 - block_radius):
+		return safe_guess
 
 	var gx := roundi(guess.x)
 	var gy := roundi(guess.y)
 
-	# 把搜索范围裁剪到「目标块不越界」的区间内，
-	# 这样 _sad 内部就可以完全省掉边界检查。
+	# 把搜索区间夹到「目标块不越界」的范围内，_sad 内部才能免去边界检查。
 	var dx_min := maxi(gx - search_radius, block_radius - cx)
-	var dx_max := mini(
-		gx + search_radius,
-		width - 1 - block_radius - cx
-	)
+	var dx_max := mini(gx + search_radius, width - 1 - block_radius - cx)
 	var dy_min := maxi(gy - search_radius, block_radius - cy)
-	var dy_max := mini(
-		gy + search_radius,
-		height - 1 - block_radius - cy
-	)
+	var dy_max := mini(gy + search_radius, height - 1 - block_radius - cy)
 
 	if dx_min > dx_max or dy_min > dy_max:
-		return guess
+		return safe_guess
 
 	var best_cost := 1 << 30
 	var best_dx := clampi(gx, dx_min, dx_max)
 	var best_dy := clampi(gy, dy_min, dy_max)
 
-	# 第一阶段：大位移先用大步长粗扫，避免全范围逐像素搜索
+	# 第一阶段：大步长粗扫（只在最粗层启用）
 	if coarse_step > 1:
 		var step_dy := dy_min
 
@@ -930,16 +767,7 @@ func _match_at_level(
 			var step_dx := dx_min
 
 			while step_dx <= dx_max:
-				var step_cost := _sad(
-					ref_img,
-					tgt_img,
-					width,
-					cx,
-					cy,
-					step_dx,
-					step_dy,
-					block_radius
-				)
+				var step_cost := _sad(ref_img, tgt_img, width, cx, cy, step_dx, step_dy, block_radius)
 
 				if step_cost < best_cost:
 					best_cost = step_cost
@@ -958,16 +786,7 @@ func _match_at_level(
 	# 第二阶段：步长 1 精扫
 	for dy in range(dy_min, dy_max + 1):
 		for dx in range(dx_min, dx_max + 1):
-			var cost := _sad(
-				ref_img,
-				tgt_img,
-				width,
-				cx,
-				cy,
-				dx,
-				dy,
-				block_radius
-			)
+			var cost := _sad(ref_img, tgt_img, width, cx, cy, dx, dy, block_radius)
 
 			if cost < best_cost:
 				best_cost = cost
@@ -979,94 +798,44 @@ func _match_at_level(
 	var sub_y := 0.0
 
 	if best_dx > dx_min and best_dx < dx_max:
-		var left := _sad(
-			ref_img, tgt_img, width, cx, cy,
-			best_dx - 1, best_dy, block_radius
-		)
-		var right := _sad(
-			ref_img, tgt_img, width, cx, cy,
-			best_dx + 1, best_dy, block_radius
-		)
-
-		sub_x = _parabolic_offset(
-			float(left),
-			float(best_cost),
-			float(right)
-		)
+		var left := _sad(ref_img, tgt_img, width, cx, cy, best_dx - 1, best_dy, block_radius)
+		var right := _sad(ref_img, tgt_img, width, cx, cy, best_dx + 1, best_dy, block_radius)
+		sub_x = _parabolic_offset(float(left), float(best_cost), float(right))
 
 	if best_dy > dy_min and best_dy < dy_max:
-		var up := _sad(
-			ref_img, tgt_img, width, cx, cy,
-			best_dx, best_dy - 1, block_radius
-		)
-		var down := _sad(
-			ref_img, tgt_img, width, cx, cy,
-			best_dx, best_dy + 1, block_radius
-		)
+		var up := _sad(ref_img, tgt_img, width, cx, cy, best_dx, best_dy - 1, block_radius)
+		var down := _sad(ref_img, tgt_img, width, cx, cy, best_dx, best_dy + 1, block_radius)
+		sub_y = _parabolic_offset(float(up), float(best_cost), float(down))
 
-		sub_y = _parabolic_offset(
-			float(up),
-			float(best_cost),
-			float(down)
-		)
-
-	return Vector2(
-		float(best_dx) + sub_x,
-		float(best_dy) + sub_y
-	)
+	return Vector2(float(best_dx) + sub_x, float(best_dy) + sub_y)
 
 
-# 一维抛物线顶点偏移量，裁剪到 ±1 像素
-func _parabolic_offset(
-	left: float,
-	center: float,
-	right: float
-) -> float:
+# 一维抛物线顶点偏移，裁剪到 ±1 像素
+func _parabolic_offset(left: float, center: float, right: float) -> float:
 	var denominator := left - 2.0 * center + right
 
 	if absf(denominator) < 1.0e-6:
 		return 0.0
 
-	return clampf(
-		0.5 * (left - right) / denominator,
-		-1.0,
-		1.0
-	)
+	return clampf(0.5 * (left - right) / denominator, -1.0, 1.0)
 
 
 # 由粗到细跟踪单个特征点，返回 L0 尺度的位移
 func _track_l0(
-	prev_pyr: Array[PackedByteArray],
-	curr_pyr: Array[PackedByteArray],
-	dims: Array[Vector2i],
-	start_l0: Vector2,
-	predict_l0: Vector2
+	prev_pyr: Array[PackedByteArray], curr_pyr: Array[PackedByteArray],
+	dims: Array[Vector2i], start_l0: Vector2, predict_l0: Vector2
 ) -> Vector2:
 	var disp := predict_l0
 
 	for level in range(COARSE_LEVEL, -1, -1):
 		var level_dims: Vector2i = dims[level]
 		var scale := float(1 << level)
-		var p_level := start_l0 / scale
-		var guess_level := disp / scale
-
-		var search_radius: int = int(SEARCH_RADII[level])
-		var block_radius: int = int(BLOCK_RADII[level])
-		var coarse_step := 1
-
-		if level == COARSE_LEVEL:
-			coarse_step = COARSE_STEP_LEVEL2
+		var coarse_step := COARSE_STEP if level == COARSE_LEVEL else 1
 
 		var delta := _match_at_level(
-			prev_pyr[level],
-			curr_pyr[level],
-			level_dims.x,
-			level_dims.y,
-			p_level,
-			guess_level,
-			search_radius,
-			block_radius,
-			coarse_step
+			prev_pyr[level], curr_pyr[level], level_dims.x, level_dims.y,
+			start_l0 / scale, disp / scale,
+			int(SEARCH_RADII[level]), int(BLOCK_RADII[level]), coarse_step
 		)
 
 		disp = delta * scale
@@ -1077,33 +846,70 @@ func _track_l0(
 # ============================================================
 # 4 自由度相似变换：RANSAC + 最小二乘
 # ============================================================
-#
-# 模型（以画面中心为原点，x 向右、y 向下）：
 #   u = tx + p*(x-cx) - q*(y-cy)
 #   v = ty + q*(x-cx) + p*(y-cy)
-#
-#   tx, ty —— 平移（像素/帧）
-#   p      —— 膨胀率（>0 画面扩张 = 前进）
-#   q      —— 滚转（>0 图像顺时针）
-#
-# 该模型把「横向平移」与「前后平移（膨胀）」天然解耦，
+#   tx,ty = 平移(像素/帧)   p = 膨胀率(>0 前进)   q = 滚转
+# 该模型把「横向平移」与「前后平移(膨胀)」天然解耦，
 # 这正是旧版「以画面中心做径向投影」做不到的。
 
 func _predict_flow(p: Vector2, center: Vector2) -> Vector2:
 	var ax := p.x - center.x
 	var ay := p.y - center.y
 
+	# 预测只用来缩小搜索范围，夹到合理幅度，
+	# 防止坏模型把搜索窗口推到画面之外。
 	return Vector2(
 		_model_tx + _model_p * ax - _model_q * ay,
 		_model_ty + _model_q * ax + _model_p * ay
-	)
+	).limit_length(MAX_FLOW_PX)
 
 
-func _fit_similarity(
-	src: Array[Vector2],
-	flow: Array[Vector2],
-	center: Vector2
-) -> Dictionary:
+# 第 i 个点对模型残差的平方
+func _point_error(ax: float, ay: float, flow: Vector2, params: Array) -> float:
+	var tx := float(params[0])
+	var ty := float(params[1])
+	var expansion := float(params[2])
+	var rotation := float(params[3])
+	var du := flow.x - (tx + expansion * ax - rotation * ay)
+	var dv := flow.y - (ty + rotation * ax + expansion * ay)
+
+	return du * du + dv * dv
+
+
+func _collect_inliers(
+	src: Array[Vector2], flow: Array[Vector2],
+	center: Vector2, params: Array, threshold: float
+) -> PackedInt32Array:
+	var inliers := PackedInt32Array()
+	var limit := threshold * threshold
+
+	for i in src.size():
+		var ax := src[i].x - center.x
+		var ay := src[i].y - center.y
+
+		if _point_error(ax, ay, flow[i], params) <= limit:
+			inliers.append(i)
+
+	return inliers
+
+
+func _residual_rms(
+	src: Array[Vector2], flow: Array[Vector2],
+	center: Vector2, params: Array, indices: PackedInt32Array
+) -> float:
+	if indices.is_empty():
+		return 0.0
+
+	var sum := 0.0
+
+	for k in indices.size():
+		var i := indices[k]
+		sum += _point_error(src[i].x - center.x, src[i].y - center.y, flow[i], params)
+
+	return sqrt(sum / float(indices.size()))
+
+
+func _fit_similarity(src: Array[Vector2], flow: Array[Vector2], center: Vector2) -> Dictionary:
 	var count := src.size()
 
 	if count < 3:
@@ -1112,7 +918,7 @@ func _fit_similarity(
 	var best_inliers := PackedInt32Array()
 	var best_count := 0
 
-	# RANSAC：2 个点正好确定 4 个自由度，最小样本取 2
+	# 4 个自由度 → 2 个点即可确定，所以 RANSAC 最小样本取 2
 	for _iteration in RANSAC_ITERATIONS:
 		var index_a := _rng.randi_range(0, count - 1)
 		var index_b := _rng.randi_range(0, count - 1)
@@ -1120,25 +926,15 @@ func _fit_similarity(
 		if index_a == index_b:
 			continue
 
-		if (
-			src[index_a].distance_to(src[index_b])
-			< RANSAC_MIN_BASELINE
-		):
+		if src[index_a].distance_to(src[index_b]) < RANSAC_MIN_BASELINE:
 			continue
 
-		var sample := PackedInt32Array([index_a, index_b])
-		var params := _solve_ls(src, flow, sample, center)
+		var params := _solve_ls(src, flow, PackedInt32Array([index_a, index_b]), center)
 
 		if params.is_empty():
 			continue
 
-		var inliers := _collect_inliers(
-			src,
-			flow,
-			center,
-			params,
-			RANSAC_INLIER_DIST
-		)
+		var inliers := _collect_inliers(src, flow, center, params, RANSAC_INLIER_DIST)
 
 		if inliers.size() > best_count:
 			best_count = inliers.size()
@@ -1147,7 +943,7 @@ func _fit_similarity(
 	if best_count < MIN_INLIERS:
 		return _translation_only(src, flow)
 
-	# 用全部内点重解一次，进一步提高精度
+	# 用全部内点重解一次，精度更高
 	var final_params := _solve_ls(src, flow, best_inliers, center)
 
 	if final_params.is_empty():
@@ -1160,22 +956,14 @@ func _fit_similarity(
 		"p_exp": final_params[2],
 		"q_rot": final_params[3],
 		"inliers": best_count,
-		"rms": _residual_rms(
-			src,
-			flow,
-			center,
-			final_params,
-			best_inliers
-		)
+		"rms": _residual_rms(src, flow, center, final_params, best_inliers)
 	}
 
 
-# 最小二乘：法方程 + 高斯消元
+# 最小二乘：法方程 + 高斯消元。返回 [tx, ty, p, q]，奇异时返回空数组。
 func _solve_ls(
-	src: Array[Vector2],
-	flow: Array[Vector2],
-	indices: PackedInt32Array,
-	center: Vector2
+	src: Array[Vector2], flow: Array[Vector2],
+	indices: PackedInt32Array, center: Vector2
 ) -> Array:
 	if indices.size() < 2:
 		return []
@@ -1190,88 +978,44 @@ func _solve_ls(
 		var ax := src[i].x - center.x
 		var ay := src[i].y - center.y
 
-		# u 行：[1, 0, ax, -ay]
-		_accumulate_row(
-			matrix,
-			rhs,
-			1.0,
-			0.0,
-			ax,
-			-ay,
-			flow[i].x
-		)
+		# 每个点贡献两行方程：u 行 [1, 0, ax, -ay]，v 行 [0, 1, ay, ax]
+		for row in 2:
+			if row == 0:
+				_basis[0] = 1.0
+				_basis[1] = 0.0
+				_basis[2] = ax
+				_basis[3] = -ay
+			else:
+				_basis[0] = 0.0
+				_basis[1] = 1.0
+				_basis[2] = ay
+				_basis[3] = ax
 
-		# v 行：[0, 1, ay, ax]
-		_accumulate_row(
-			matrix,
-			rhs,
-			0.0,
-			1.0,
-			ay,
-			ax,
-			flow[i].y
-		)
+			var target := flow[i].x if row == 0 else flow[i].y
+
+			for a in 4:
+				for b in 4:
+					matrix[a * 4 + b] += _basis[a] * _basis[b]
+
+				rhs[a] += _basis[a] * target
 
 	return _solve4(matrix, rhs)
 
 
-func _accumulate_row(
-	matrix: PackedFloat32Array,
-	rhs: PackedFloat32Array,
-	j0: float,
-	j1: float,
-	j2: float,
-	j3: float,
-	target: float
-) -> void:
-	matrix[0] += j0 * j0
-	matrix[1] += j0 * j1
-	matrix[2] += j0 * j2
-	matrix[3] += j0 * j3
-
-	matrix[4] += j1 * j0
-	matrix[5] += j1 * j1
-	matrix[6] += j1 * j2
-	matrix[7] += j1 * j3
-
-	matrix[8] += j2 * j0
-	matrix[9] += j2 * j1
-	matrix[10] += j2 * j2
-	matrix[11] += j2 * j3
-
-	matrix[12] += j3 * j0
-	matrix[13] += j3 * j1
-	matrix[14] += j3 * j2
-	matrix[15] += j3 * j3
-
-	rhs[0] += j0 * target
-	rhs[1] += j1 * target
-	rhs[2] += j2 * target
-	rhs[3] += j3 * target
-
-
-# 4x4 高斯消元（部分主元）。
-# 返回 [tx, ty, p, q]，奇异时返回空数组。
-func _solve4(
-	matrix: PackedFloat32Array,
-	rhs: PackedFloat32Array
-) -> Array:
+# 4x4 高斯消元（部分主元）
+func _solve4(matrix: PackedFloat32Array, rhs: PackedFloat32Array) -> Array:
 	var augmented := PackedFloat32Array()
 	augmented.resize(20)
 
 	for row in 4:
 		for column in 4:
-			augmented[row * 5 + column] = (
-				matrix[row * 4 + column]
-			)
+			augmented[row * 5 + column] = matrix[row * 4 + column]
 
 		augmented[row * 5 + 4] = rhs[row]
 
 	for column in 4:
 		var pivot_row := column
-		var pivot_value := absf(
-			augmented[column * 5 + column]
-		)
+		var pivot_value := absf(augmented[column * 5 + column])
 
 		for row in range(column + 1, 4):
 			var value := absf(augmented[row * 5 + column])
@@ -1286,9 +1030,7 @@ func _solve4(
 		if pivot_row != column:
 			for c in range(column, 5):
 				var tmp := augmented[column * 5 + c]
-				augmented[column * 5 + c] = (
-					augmented[pivot_row * 5 + c]
-				)
+				augmented[column * 5 + c] = augmented[pivot_row * 5 + c]
 				augmented[pivot_row * 5 + c] = tmp
 
 		var diagonal := augmented[column * 5 + column]
@@ -1306,93 +1048,16 @@ func _solve4(
 				continue
 
 			for c in range(column, 5):
-				augmented[row * 5 + c] -= (
-					factor * augmented[column * 5 + c]
-				)
+				augmented[row * 5 + c] -= factor * augmented[column * 5 + c]
 
-	return [
-		augmented[4],
-		augmented[9],
-		augmented[14],
-		augmented[19]
-	]
+	return [augmented[4], augmented[9], augmented[14], augmented[19]]
 
 
-func _collect_inliers(
-	src: Array[Vector2],
-	flow: Array[Vector2],
-	center: Vector2,
-	params: Array,
-	threshold: float
-) -> PackedInt32Array:
-	var inliers := PackedInt32Array()
-	var limit := threshold * threshold
-
-	var tx := float(params[0])
-	var ty := float(params[1])
-	var expansion := float(params[2])
-	var rotation := float(params[3])
-
-	for i in src.size():
-		var ax := src[i].x - center.x
-		var ay := src[i].y - center.y
-
-		var du := flow[i].x - (
-			tx + expansion * ax - rotation * ay
-		)
-		var dv := flow[i].y - (
-			ty + rotation * ax + expansion * ay
-		)
-
-		if du * du + dv * dv <= limit:
-			inliers.append(i)
-
-	return inliers
-
-
-func _residual_rms(
-	src: Array[Vector2],
-	flow: Array[Vector2],
-	center: Vector2,
-	params: Array,
-	indices: PackedInt32Array
-) -> float:
-	if indices.is_empty():
-		return 0.0
-
-	var tx := float(params[0])
-	var ty := float(params[1])
-	var expansion := float(params[2])
-	var rotation := float(params[3])
-
-	var sum := 0.0
-
-	for k in indices.size():
-		var i := indices[k]
-		var ax := src[i].x - center.x
-		var ay := src[i].y - center.y
-
-		var du := flow[i].x - (
-			tx + expansion * ax - rotation * ay
-		)
-		var dv := flow[i].y - (
-			ty + rotation * ax + expansion * ay
-		)
-
-		sum += du * du + dv * dv
-
-	return sqrt(sum / float(indices.size()))
-
-
-# 退化路径：RANSAC 找不到足够内点时，只输出鲁棒平移，
-# 并把膨胀/旋转置 0（宁可不给前进信号，也不给错误信号）。
-func _translation_only(
-	src: Array[Vector2],
-	flow: Array[Vector2]
-) -> Dictionary:
+# 退化路径：RANSAC 找不到足够内点时只输出鲁棒平移，
+# 膨胀/旋转置 0（宁可不给前进信号，也不给错误信号）。
+func _translation_only(src: Array[Vector2], flow: Array[Vector2]) -> Dictionary:
 	var xs := PackedFloat32Array()
 	var ys := PackedFloat32Array()
-
 	xs.resize(flow.size())
 	ys.resize(flow.size())
 
@@ -1400,31 +1065,23 @@ func _translation_only(
 		xs[i] = flow[i].x
 		ys[i] = flow[i].y
 
+	xs.sort()
+	ys.sort()
+
+	var middle := flow.size() >> 1
+	var even := flow.size() % 2 == 0
+	var tx := (xs[middle - 1] + xs[middle]) * 0.5 if even else xs[middle]
+	var ty := (ys[middle - 1] + ys[middle]) * 0.5 if even else ys[middle]
+
 	return {
 		"valid": src.size() >= MIN_INLIERS,
-		"tx": _median_sorted(xs),
-		"ty": _median_sorted(ys),
+		"tx": tx,
+		"ty": ty,
 		"p_exp": 0.0,
 		"q_rot": 0.0,
 		"inliers": src.size(),
 		"rms": 0.0
 	}
-
-
-func _median_sorted(values: PackedFloat32Array) -> float:
-	var count := values.size()
-
-	if count == 0:
-		return 0.0
-
-	values.sort()
-
-	var middle := count >> 1
-
-	if count % 2 == 0:
-		return (values[middle - 1] + values[middle]) * 0.5
-
-	return values[middle]
 
 
 # ============================================================
