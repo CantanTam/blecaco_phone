@@ -31,7 +31,7 @@ window/stretch/aspect="expand"
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/GodotAndroidPluginTemplate/plugin.cfg", "res://addons/NativeCameraPlugin/plugin.cfg", "res://addons/gdscript_digit_mapper/plugin.cfg", "res://addons/OpenVINSPlugin/plugin.cfg")
+enabled=PackedStringArray("res://addons/GodotAndroidPluginTemplate/plugin.cfg", "res://addons/NativeCameraPlugin/plugin.cfg", "res://addons/gdscript_digit_mapper/plugin.cfg")
 
 [input_devices]
 

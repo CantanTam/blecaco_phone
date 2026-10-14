@@ -335,6 +335,50 @@ OpenVINS**，虽然只是加几行边界判断，但上次编辑被拒绝了，�
 
 ---
 
+## 7. 2026-10-14：OpenVINS 方案终止（回退说明）
+
+**结论：放弃把 OpenVINS 接入 Free Mode 这条路线。**
+
+### 为什么停
+
+用了大量时间把链路全部打通、也定位到了最后一个卡点，但始终没能让视觉更新
+真正约束滤波器：
+
+- ✅ 已解决：桥接层 4 个 Android 侧 bug、权限、时钟对齐、帧格式、外参推导、
+  内参在线收敛、配置对齐金标准、clone 饥饿（线程模型）、崩溃
+- ❌ 未解决：`good_features_MSCKF` 全程为 0 —— MSCKF 视觉更新用不上特征，
+  滤波器退化成纯 IMU 递推，手机静止放桌上时位置仍以 ~1.5 m/s 漂移
+  （最好的一次 `dist` 约 40 m，最差 300 多公里）
+
+换句话说：**初始化、标定、时间对齐全是好的，但"视觉更新"这一步始终是空的。**
+要继续只剩两条路，成本都不低：
+1. 改 vendored OpenVINS 打日志，逐段定位特征是何时被丢掉的；
+2. 给 `NativeCameraPlugin` 打补丁暴露 `SENSOR_TIMESTAMP`（时间戳三次运行
+   估计出的偏移在 ±40 ms 之间跳，抖动很大）。
+
+决定不再投入。
+
+### 回退内容（保留无副作用的改进）
+
+| 动作 | 文件 |
+| --- | --- |
+| 回退到接 OpenVINS 之前 | `scenes/modes/free_mode.tscn`、`scripts/modes/free_mode.gd`（Free Mode 重回光流） |
+| 回退 Blender 端尺度映射 | `blecaco/free_action.py`（光流是像素单位，不能用米制映射） |
+| 取消插件注册 | `project.godot` 的 `editor_plugins/enabled` 移除 OpenVINSPlugin |
+| 取消打包 | `export_presets.cfg` 的 `include_filter` 与
+`permissions/custom_permissions` 还原（APK 因此不再打入 16 MB 的 AAR） |
+| **保留** | `scripts/connection.gd` 的日志开关治理、
+`scripts/autoload/options.gd`、本目录两份文档、`addons/OpenVINSPlugin/`
+的全部文件（留在磁盘上，未注册即不打包，方便日后重启） |
+
+### 如果以后想拾起
+
+- 入口：`docs/openvins_integration.md`（集成步骤）+ 本文件第 3.1 节（完整证据链）
+- 关键未解点：`feats=0`（3.1.6 节）
+- 相关提交：`mobile` 的 `f2c8b0f` / `30ba745` / `96238bc` / `601e003`
+
+---
+
 ## 4. 调试工具箱（省时间用）
 
 ```bash

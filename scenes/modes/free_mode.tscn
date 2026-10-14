@@ -1,8 +1,8 @@
 [gd_scene format=3 uid="uid://cua0spcdm0i2h"]
 
 [ext_resource type="Script" uid="uid://s6ggvc81fx7" path="res://scripts/modes/free_mode.gd" id="1_cx1p0"]
+[ext_resource type="Script" uid="uid://d0c75k44l604q" path="res://scripts/modes/optical_flow_controller.gd" id="2_y5shr"]
 [ext_resource type="Script" uid="uid://iws2m5f75rfc" path="res://addons/NativeCameraPlugin/NativeCamera.gd" id="3_wmy0e"]
-[ext_resource type="Script" path="res://addons/OpenVINSPlugin/OpenVINS.gd" id="4_vios"]
 
 [node name="FreeMode" type="Control" unique_id=311837689]
 layout_mode = 3
@@ -14,12 +14,12 @@ grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("1_cx1p0")
 
-[node name="NativeCamera" type="Node" parent="." unique_id=1837212870]
+[node name="OpticalFlowController" type="Node" parent="." unique_id=722219265]
+script = ExtResource("2_y5shr")
+
+[node name="NativeCamera" type="Node" parent="OpticalFlowController" unique_id=1837212870]
 script = ExtResource("3_wmy0e")
 metadata/_custom_type_script = "uid://iws2m5f75rfc"
-
-[node name="OpenVINS" type="Node" parent="." unique_id=556677889]
-script = ExtResource("4_vios")
 
 [node name="ColorRect" type="ColorRect" parent="." unique_id=303001493]
 layout_mode = 1
