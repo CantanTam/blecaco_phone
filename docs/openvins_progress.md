@@ -136,7 +136,105 @@ clear && adb install -r ~/open_vins_mobile/app/build/outputs/apk/debug/app-debug
 
 ---
 
-## 3.1 剩余待办（按性价比排序）
+## 3.1 2026-10-14 上午：对齐金标准配置后的新发现（最新）
+
+#### 3.1.1 配置已对齐，但**问题变了**
+
+对齐 `app_device` 的 12 个值后（提交 `30ba745`），行为发生了实质变化：
+
+- ✅ **现在能初始化了**：`init=true`，`poses` 持续增长
+- ✅ **在线标定收敛**，数值都合理：
+  ```
+  camera-imu timeoffset = -0.03951 s        ← 估计出 -39.5 ms（与"到达时刻"晚于曝光一致）
+  cam0 intrinsics = 520.7, 511.1, 306.6, 239.0 | -0.043,-0.003,-0.011,0.008
+  cam0 extrinsics = -0.711,0.702,0.028,0.026 | ...   ≈ [[0,-1,0],[-1,0,0],[0,0,-1]] ✅ 初值是对的
+  bg = 0.0229,-0.0010,0.0032 | ba = -0.0654,-0.1725,0.1871   ← 偏置很小，健康
+  ```
+- ❌ **但轨迹仍然爆炸**：手机静止时位置一路涨到 **53 公里**（`dist = 53128 m`）
+
+#### 3.1.2 发散形态已定量确认：**是重力没被抵消**
+
+从心跳提取位置序列做拟合（`poses` 近似正比于时间）：
+
+```
+poses=  19   |p| =      0.02 m
+poses=1625   |p| =     37.94 m
+poses=3181   |p| =   1046.78 m
+poses=5217   |p| =  10096.72 m
+poses=7757   |p| =  44680.44 m
+
+线性拟合 |p| ≈ 5.5·t          残差 6.96e9
+二次拟合 |p| ≈ 1.384e-3·t²    残差 3.54e8   ← 明显更优
+```
+
+`poses` 约 54/秒 ⟹ **加速度 ≈ 8.1 m/s²，几乎就是 g=9.81**。
+
+**结论：姿态（重力方向）没有被正确估计，重力被当成线性加速度积分了。**
+而 `ba` 只有 0.19 m/s²，所以**不是加计偏置问题，是初始姿态问题**。
+
+#### 3.1.3 顺带挖到的两个关键事实
+
+**① OpenVINS 的内部日志一直在 logcat 里，tag 是 `OpenVINS`（不是 `OpenVINSGodot`）**
+
+```bash
+adb logcat | grep 'OpenVINS('
+```
+
+这条以后是排查的主武器，能直接看到：
+`[init]: disparity is ...`、`[init]: failed static init: ...`、
+以及标定收敛值（extrinsics / intrinsics / timeoffset / biases）。
+
+**② App 会在约 2 分钟后被一个 Eigen 断言崩溃杀掉**
+
+```
+signal 6 (SIGABRT)
+Eigen/src/Core/Block.h:147: assertion "startRow >= 0 && blockRows >= 0 && ..." failed
+#02 ov_core::FeatureHelper::compute_disparity(...)
+```
+
+源码位置 `ov_core/src/feat/FeatureHelper.h`，两处重载都有同样的隐患：
+
+```cpp
+for (size_t idx = 0; idx < feat.second->timestamps.at(camid).size(); idx++) {   // ← 用 timestamps 的长度
+    ...
+    uv0 = feat.second->uvs.at(camid).at(idx).block(0, 0, 2, 1);                 // ← 去索引 uvs，且假定 >= 2 个元素
+```
+
+`uvs` 与 `timestamps` 一旦短暂不同步，或某个 uv 向量长度 < 2，
+`.block(0,0,2,1)` 就会触发 Eigen 断言 → **整个 App SIGABRT**。
+修法很短（加边界判断 + `head<2>()`），但属于**改动 vendored OpenVINS**，需要确认后再动。
+
+#### 3.1.4 与参考实现逐项对比后的结论
+
+| 项目 | 参考实现 | 我们 | 判断 |
+| --- | --- | --- | --- |
+| 相机-IMU 外参 | `T_cam_imu ≈ [[0,-1,0],[-1,0,0],[0,0,-1]]` | 同 | ✅ 一致 |
+| 图像朝向 | 直接用原始 sensor 朝向（不旋转） | 同（`rotation=90` 只是元数据） | ✅ 一致 |
+| IMU 配对逻辑 | accel+gyro 配对后一次投递 | 同 | ✅ 一致 |
+| JNI 参数顺序 | `(ax,ay,az,gx,gy,gz,t)` | 同 | ✅ 一致 |
+| IMU↔加速度赋值 | `wm`←gyro, `am`←accel | 同 | ✅ 一致 |
+| **相机时间戳** | **`image.timestamp`（SENSOR_TIMESTAMP）** | GDScript 收到帧的**到达时刻** | ❌ **不一致** |
+| **传感器回调线程** | 主线程（不传 handler） | 专用 `OpenVINSImu` 线程 | ⚠️ 不一致 |
+
+> ⚠️ **线程问题值得重视**：OpenVINS 的 ROS 节点是**单线程**喂数据的，其
+> `feed_measurement_imu` 与 `feed_measurement_camera` 都会调用
+> `propagator->propagate_and_clone(state, …)`。我们现在 IMU 在
+> `OpenVINSImu` 线程、相机在 worker 线程**并发**调用，这是上游设计里
+> 不存在的竞态，可能破坏状态（并解释那个 Eigen 崩溃）。
+
+#### 3.1.5 接下来的候选动作（按信息量排序）
+
+1. **把 IMU 也改由 worker 线程统一喂**（IMU 先进队列），彻底消除竞态
+   —— 同时很可能顺带解决那个 Eigen 崩溃。
+2. **导出原始 IMU 数据核对**：把 `setRecording(true)` 接到 GDScript，
+   跑一次拿到 `imu0.csv`，离线确认加速度计的量级/符号/单位是否正常，
+   直接判定"初始姿态为何错"。
+3. **相机时间戳换成 `SENSOR_TIMESTAMP`**（需要 `NativeCameraPlugin` 源码）。
+4. **跑一遍参考 App 做交叉验证**：如果它在同一台手机上静止时也漂，
+   说明问题不在我们的胶水层；如果它稳，就继续逐项 diff。
+
+
+## 3.2 剩余待办（按性价比排序）
 
 ### ① 真实曝光时间戳（唯一的输入差异）
 
