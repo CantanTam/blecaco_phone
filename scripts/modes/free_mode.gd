@@ -1,7 +1,11 @@
 extends Node
 
-const ROTATION_SEND_INTERVAL: float = 1.0 / 100.0
 const INITIALIZE_RETRY_INTERVAL: float = 0.25
+
+# 发送频率自适应 Blender 的输出帧率（插件推送 → main.gd 收下 → Options）。
+# 规则同 plane_mode.gd：不低于 MIN（实时手感），不高于 MAX（别刷爆）。
+const MIN_SEND_RATE: float = 60.0
+const MAX_SEND_RATE: float = 120.0
 
 # 打开后会以 ~100Hz 打印每条四元数，会把 logcat 环形缓冲区冲掉，
 # 导致真正有用的日志在你回看时已经消失；排查时再改 true。
@@ -21,6 +25,15 @@ var phone_calibrated: bool = false
 
 # Blender 是否已经记录摄像机初始姿态
 var free_mode_initialized: bool = false
+
+
+# 当前发送频率（Hz）：跟着 Blender 的输出帧率走
+func _send_rate() -> float:
+	return clampf(
+		Options.get_float("blender/output_fps"),
+		MIN_SEND_RATE,
+		MAX_SEND_RATE
+	)
 
 
 func _ready() -> void:
@@ -100,7 +113,7 @@ func _process(delta: float) -> void:
 	# 初始化完成后，继续以约 100 Hz 发送手机相对旋转
 	rotation_send_timer += delta
 
-	if rotation_send_timer < ROTATION_SEND_INTERVAL:
+	if rotation_send_timer < 1.0 / _send_rate():
 		return
 
 	rotation_send_timer = 0.0

@@ -6,6 +6,10 @@ signal connection_succeeded
 signal connection_failed
 signal connection_lost
 
+## action 发送开关变化时发出（由 LinkButton 触发）。
+## 表现层可以据此提示"当前按了也不会发出去"。
+signal action_sending_changed(enabled: bool)
+
 const INITIAL_CONNECTION_TIMEOUT := 2.0
 const RECONNECT_INTERVAL := 3.0
 
@@ -116,6 +120,8 @@ func set_action_sending_enabled(enabled: bool) -> void:
 
 	action_sending_enabled = enabled
 	print("[Godot] Action JSON sending enabled: ", enabled)
+
+	action_sending_changed.emit(enabled)
 	
 	
 # json 结构

@@ -10,8 +10,36 @@ func _ready() -> void:
 	stream.connection_succeeded.connect(_on_stream_connection_succeeded)
 	stream.connection_failed.connect(_on_stream_connection_failed)
 	connection.connection_lost.connect(_on_connection_lost)
+	connection.text_message_received.connect(_on_text_message_received)
 
 	stream.visible = false
+
+
+# Blender 推来的设置（目前只有输出帧率）。
+# 在这里接收并写进 Options，而不是让各模式各自监听：
+# 模式场景是连接成功之后才加载的，Blender 的推送可能早于它，
+# 放在 main（常驻）里收下，模式启动时直接读就行。
+func _on_text_message_received(message: String) -> void:
+	var data: Variant = JSON.parse_string(message)
+
+	if not (data is Dictionary):
+		return
+
+	if data.get("type") != "setting":
+		return
+
+	if data.get("name") != "output_fps":
+		return
+
+	var fps: float = float(data.get("value", 0.0))
+
+	if fps <= 0.0:
+		return
+
+	# 只更新内存，不落盘：这个值只对当前连接的那台 Blender 有效
+	Options.set_value("blender/output_fps", fps, false)
+
+	print("[Main] Blender 输出帧率同步：", fps, " fps")
 
 
 func _on_qr_scanned(url: String) -> void:
