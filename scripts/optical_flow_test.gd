@@ -1,20 +1,35 @@
-
 extends Node
+
+# ============================================================
+# 光流调试场景
+# ============================================================
+# 本场景不再自带一份算法副本，而是直接复用
+# scripts/modes/optical_flow_controller.gd 里的实现，
+# 只负责把估算结果和耗时打印出来，方便真机调参。
+#
+# 注意：这里是在主线程直接调用的，会阻塞渲染线程，
+# 所以帧率看起来会很低——这是刻意为之，只为看数据。
+# ============================================================
+
+const ControllerScript := preload(
+	"res://scripts/modes/optical_flow_controller.gd"
+)
 
 @onready var camera: NativeCamera = $NativeCamera
 
-var frame_count: int = 0
+const LOG_INTERVAL: int = 15
 
-var previous_buffer: PackedByteArray = PackedByteArray()
-var last_match_count: int = 0
-var last_radial_motion: float = 0.0
-
-const BLOCK_RADIUS: int = 2
-const SEARCH_RADIUS: int = 4
-const GRID_STEP: int = 24
+var _estimator: Node = null
+var _previous_buffer: PackedByteArray = PackedByteArray()
+var _frame_count: int = 0
+var _measured_frames: int = 0
+var _total_estimate_usec: int = 0
 
 
 func _ready() -> void:
+	# 只借用算法函数，不进入场景树，因此不会启动后台线程
+	_estimator = ControllerScript.new()
+
 	camera.frame_width = 320
 	camera.frame_height = 240
 	camera.frames_to_skip = 0
@@ -25,12 +40,20 @@ func _ready() -> void:
 
 	camera.frame_available.connect(_on_frame_available)
 	camera.camera_permission_granted.connect(_start_camera)
-	camera.camera_permission_denied.connect(_on_camera_permission_denied)
+	camera.camera_permission_denied.connect(
+		_on_camera_permission_denied
+	)
 
 	if camera.has_camera_permission():
 		_start_camera()
 	else:
 		camera.request_camera_permission()
+
+
+func _exit_tree() -> void:
+	if _estimator != null:
+		_estimator.free()
+		_estimator = null
 
 
 func _start_camera() -> void:
@@ -66,195 +89,66 @@ func _on_camera_permission_denied() -> void:
 
 
 func _on_frame_available(info: FrameInfo) -> void:
-	frame_count += 1
-	if frame_count % 30 == 0:
-		print(
-			"[OpticalFlow] Frame callback #",
-			frame_count,
-			" | Size=",
-			info.get_width(),
-			"x",
-			info.get_height(),
-			" | Grayscale=",
-			info.is_grayscale()
-		)
+	if not info.is_grayscale():
+		return
 
 	var current_buffer: PackedByteArray = info.get_buffer()
 	var width: int = info.get_width()
 	var height: int = info.get_height()
 
-	if not info.is_grayscale():
-		return
-
 	if current_buffer.size() != width * height:
 		return
 
-	if previous_buffer.is_empty():
-		previous_buffer = current_buffer.duplicate()
+	_frame_count += 1
+
+	if _previous_buffer.is_empty():
+		_previous_buffer = current_buffer.duplicate()
 		print("First grayscale frame stored: ", width, "x", height)
 		return
 
-	if frame_count % 2 == 0:
-		var motion: Vector2 = _estimate_image_motion(
-			previous_buffer,
-			current_buffer,
-			width,
-			height
-		)
-
-		if frame_count % 30 == 0:
-			var radial_label: String = "无明显径向趋势"
-
-			if last_radial_motion > 1.0:
-				radial_label = "画面扩张（疑似前进）"
-			elif last_radial_motion < -1.0:
-				radial_label = "画面收缩（疑似后退）"
-
-			print(
-				"X=", motion.x,
-				" Y=", motion.y,
-				" | Radial=", last_radial_motion,
-				" | Trend=", radial_label,
-				" | Matched blocks=", last_match_count
-			)
-			print(
-				"Image motion (pixels/frame): X=",
-				motion.x,
-				" Y=",
-				motion.y,
-				" | Radial=",
-				last_radial_motion,
-				" | Matched blocks=",
-				last_match_count
-			)
-			
-		previous_buffer = current_buffer.duplicate()
-	
-	
-func _estimate_image_motion(
-	previous: PackedByteArray,
-	current: PackedByteArray,
-	width: int,
-	height: int
-) -> Vector2:
-	var dx_values: Array[int] = []
-	var dy_values: Array[int] = []
-	var radial_values: Array[float] = []
-
-	var block_size: int = BLOCK_RADIUS * 2 + 1
-	var block_area: int = block_size * block_size
-
-	var center_x: float = width * 0.5
-	var center_y: float = height * 0.5
-
-	last_match_count = 0
-
-	for y in range(
-		BLOCK_RADIUS + SEARCH_RADIUS,
-		height - BLOCK_RADIUS - SEARCH_RADIUS,
-		GRID_STEP
-	):
-		for x in range(
-			BLOCK_RADIUS + SEARCH_RADIUS,
-			width - BLOCK_RADIUS - SEARCH_RADIUS,
-			GRID_STEP
-		):
-			var min_pixel: int = 255
-			var max_pixel: int = 0
-
-			for py in range(-BLOCK_RADIUS, BLOCK_RADIUS + 1):
-				for px in range(-BLOCK_RADIUS, BLOCK_RADIUS + 1):
-					var pixel: int = int(
-						previous[(y + py) * width + x + px]
-					)
-
-					if pixel < min_pixel:
-						min_pixel = pixel
-
-					if pixel > max_pixel:
-						max_pixel = pixel
-
-			if max_pixel - min_pixel < 12:
-				continue
-
-			var best_cost: int = 1000000
-			var best_dx: int = 0
-			var best_dy: int = 0
-
-			for dy in range(-SEARCH_RADIUS, SEARCH_RADIUS + 1):
-				for dx in range(-SEARCH_RADIUS, SEARCH_RADIUS + 1):
-					var cost: int = 0
-
-					for py in range(-BLOCK_RADIUS, BLOCK_RADIUS + 1):
-						for px in range(-BLOCK_RADIUS, BLOCK_RADIUS + 1):
-							var previous_index: int = (
-								(y + py) * width + x + px
-							)
-							var current_index: int = (
-								(y + dy + py) * width + x + dx + px
-							)
-
-							cost += abs(
-								int(previous[previous_index])
-								- int(current[current_index])
-							)
-
-					if cost < best_cost:
-						best_cost = cost
-						best_dx = dx
-						best_dy = dy
-
-			if float(best_cost) / float(block_area) <= 45.0:
-				dx_values.append(best_dx)
-				dy_values.append(best_dy)
-
-				var radial_x: float = float(x) - center_x
-				var radial_y: float = float(y) - center_y
-				var radial_length: float = Vector2(
-					radial_x,
-					radial_y
-				).length()
-
-				if radial_length > 20.0:
-					var radial_motion: float = (
-						float(best_dx) * radial_x
-						+ float(best_dy) * radial_y
-					) / radial_length
-
-					radial_values.append(radial_motion)
-
-	last_match_count = dx_values.size()
-
-	if last_match_count < 8 or radial_values.size() < 8:
-		last_radial_motion = 0.0
-		return Vector2.ZERO
-
-	radial_values.sort()
-
-	var radial_middle: int = int(radial_values.size() / 2)
-
-	if radial_values.size() % 2 == 0:
-		last_radial_motion = (
-			radial_values[radial_middle - 1]
-			+ radial_values[radial_middle]
-		) / 2.0
-	else:
-		last_radial_motion = radial_values[radial_middle]
-
-	return Vector2(
-		_median(dx_values),
-		_median(dy_values)
+	var start := Time.get_ticks_usec()
+	var result: Dictionary = _estimator._estimate_motion(
+		_previous_buffer,
+		current_buffer,
+		width,
+		height,
+		true
 	)
+	_total_estimate_usec += Time.get_ticks_usec() - start
+	_measured_frames += 1
 
-func _median(values: Array[int]) -> float:
-	values.sort()
+	_previous_buffer = current_buffer.duplicate()
 
-	var middle: int = int(values.size() / 2)
+	if _frame_count % LOG_INTERVAL != 0:
+		return
 
-	if values.size() % 2 == 0:
-		return (
-			float(values[middle - 1])
-			+ float(values[middle])
-		) / 2.0
+	var motion := Vector2(result["motion"])
+	var radial := float(result["radial"])
 
-	return float(values[middle])
+	var label: String = "无明显径向趋势"
+
+	if radial > 1.0:
+		label = "画面扩张（疑似前进）"
+	elif radial < -1.0:
+		label = "画面收缩（疑似后退）"
+
+	print(
+		"X=", snappedf(motion.x, 0.01),
+		" Y=", snappedf(motion.y, 0.01),
+		" | Radial=", snappedf(radial, 0.01),
+		" | Trend=", label,
+		" | Inliers=", result["inliers"],
+		"/", result["features"],
+		" | FBreject=", result["fb_rejected"],
+		" | Roll=", snappedf(float(result["rotation"]), 0.0001),
+		" | Expand=", snappedf(float(result["expansion"]), 0.0001),
+		" | RMS=", snappedf(float(result["rms"]), 0.01),
+		" | valid=", result["valid"],
+		" | est=", snappedf(
+			float(_total_estimate_usec)
+			/ 1000.0
+			/ float(maxi(_measured_frames, 1)),
+			0.01
+		),
+		" ms"
+	)
