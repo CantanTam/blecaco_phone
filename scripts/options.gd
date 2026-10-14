@@ -48,7 +48,8 @@ const DEFAULT_MODE_SCENE := MODE_SCENES["FreeCover"]
 # key = "section/name"，与 .cfg 的分区一一对应。
 # ------------------------------------------------------------
 const DEFAULTS := {
-	"mode/scene_path": DEFAULT_MODE_SCENE
+	"mode/scene_path": DEFAULT_MODE_SCENE,
+	"plane/plane_speed": 1.0
 }
 
 # 运行期的实际取值（_load 时以 DEFAULTS 为底，再用存档覆盖）

@@ -8,9 +8,16 @@
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_n2t7d"]
 shader = ExtResource("3_g1exo")
+shader_parameter/mask_texture = ExtResource("2_v5b1u")
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_glow"]
 shader = ExtResource("4_glow")
+shader_parameter/circle_color = Color(1, 1, 1, 1)
+shader_parameter/circle_size = 200.0
+shader_parameter/gradient_start = 0.0
+shader_parameter/mask_texture = ExtResource("2_v5b1u")
+shader_parameter/node_size = Vector2(1, 1)
+shader_parameter/circle_center = Vector2(0, 0)
 
 [node name="PlaneMode" type="Control" unique_id=311837689]
 layout_mode = 3

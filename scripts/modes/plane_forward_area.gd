@@ -14,6 +14,8 @@ extends Control
 # ============================================================
 
 # ---------------- 变量设置（改这里就够）----------------
+const FORWARD_SEND_INTERVAL: float = 0.01
+const FORWARD_STEP_DISTANCE: float = 0.01
 
 # 形状遮罩：两个材质共用同一张图
 @export var mask_texture: Texture2D = preload(
@@ -35,7 +37,6 @@ const Y_GREEN_END := 350.0       # 0   ~ 350   纯绿
 const Y_GREEN_TO_YELLOW := 515.0 # 350 ~ 515   绿 -> 黄
 const Y_YELLOW_END := 610.0      # 515 ~ 610   纯黄
 const Y_YELLOW_TO_RED := 710.0   # 610 ~ 710   黄 -> 红
-								 # 710 以上    纯红
 
 # 箭头底色（ForwardBottomColor）
 @export var base_color: Color = Color(1.0, 1.0, 1.0, 0.117647)
@@ -57,8 +58,13 @@ var active_touches: Dictionary = {}
 var mouse_pressed: bool = false
 var mouse_position: Vector2 = Vector2.ZERO
 
+var connection_node: Node = null
+var forward_active: bool = false
+var forward_send_timer: float = 0.0
+
 
 func _ready() -> void:
+	connection_node = get_tree().root.find_child("Connection",true,	false)
 	_glow_material = glow_color.material as ShaderMaterial
 	_base_material = bottom_color.material as ShaderMaterial
 
@@ -88,6 +94,40 @@ func _apply_style() -> void:
 	_glow_material.set_shader_parameter("circle_size", circle_size)
 	_glow_material.set_shader_parameter("gradient_start", gradient_start)
 
+
+func _process(delta: float) -> void:
+	if not forward_active:
+		forward_send_timer = 0.0
+		return
+
+	if connection_node == null:
+		return
+
+	if not is_instance_valid(connection_node):
+		return
+
+	if not connection_node.has_method("send_action"):
+		return
+
+	forward_send_timer += delta
+
+	if forward_send_timer < FORWARD_SEND_INTERVAL:
+		return
+
+	forward_send_timer = 0.0
+
+	connection_node.call(
+		"send_action",
+		"plane",
+		{
+			"command": "forward",
+			"distance": FORWARD_STEP_DISTANCE * maxf(
+				0.0,
+				Options.get_float("plane/plane_speed")
+			)
+		}
+	)
+	
 
 func _input(event: InputEvent) -> void:
 	if not is_visible_in_tree():
@@ -138,6 +178,8 @@ func _update_feedback() -> void:
 	if not is_inside and mouse_pressed and _is_inside(mouse_position):
 		active_position = mouse_position
 		is_inside = true
+		
+	forward_active = is_inside
 
 	# 箭头底色：按下 → 变实心
 	bottom_color.color.a = (
