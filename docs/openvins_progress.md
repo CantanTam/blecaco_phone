@@ -1,3 +1,5 @@
+clear && adb install -r ~/open_vins_mobile/app/build/outputs/apk/debug/app-debug.apk
+￼
 # OpenVINS 接入进度与遗留问题（交接笔记）
 
 > 记录日期：2026-10-14 凌晨
@@ -23,7 +25,7 @@
 
 **结论：Godot → Java → OpenVINS → GDScript → WebSocket → Blender 整条链路已打通，且位移是米制。**
 
-### ❌ 唯一遗留问题
+### ❌ 唯一遗留问题（**已定位原因并修正，待实测确认**）
 
 **手机静止不动时，VIO 输出的位置仍持续漂移。**
 
@@ -31,6 +33,15 @@
 `0.096 → 0.496 → 1.538 → 2.661 → 4.724 m` 指数增长。
 
 刚初始化后的头几秒是好的（每步约 0.02 m），之后逐渐发散。
+
+> **根因已找到**：`estimator_config.yaml` 里的观测噪声/卡方门限写错了
+> （`up_*_chi2_multipler: 1`、`up_*_sigma_px: 1`，金标准是 `5` / `2`），
+> 导致视觉更新被大量拒绝、滤波器退化成纯 IMU 递推。
+> 详细对比与修正见第 3 节 —— 修正后**尚未在本机实测验证**。
+>
+> ⚠️ 修正带来的行为变化：初始化阈值收紧后（`init_imu_thresh: 0.4`、
+> `init_max_disparity: 2.0`），**手机必须真正静止（最好放桌上）才会初始化**；
+> 拿着手轻微晃动可能一直停在 `init=false`，这不代表故障。
 
 ---
 
@@ -81,45 +92,88 @@
 
 ## 3. 明天从这里继续
 
-### 最高优先级：确定相机-IMU 外参的旋转
+### 🔑 最重要的一条：仓库里有「金标准」配置，不要再自己推导
 
-目前配置里是 `R_CtoI = [[0,-1,0],[-1,0,0],[0,0,-1]]`（**候选 B**）；
-历史上还用过 `[[0,1,0],[1,0,0],[0,0,-1]]`（**候选 A**）。
-**两个候选都曾让 VIO 成功初始化，之后都发散**，所以目前尚无定论。
+`/home/one/open_vins_mobile/app_device/config/` 是**本项目在真机上实测跑通**
+（能初始化、能出轨迹）的配置，配合 `app_device/sync_device.sh` 推到手机上。
+**它不针对某一台手机特调**，是通用可用的起点。
 
-已掌握的硬证据：
+已逐项 diff 并**对齐**到我们的 `addons/OpenVINSPlugin/config/estimator_config.yaml`
+（参考 73 个键，现在只剩 `record_timing_filepath` 一处差异，而该项在
+`record_timing_information: false` 下不生效）。
 
-- 把喂给 VIO 的灰度帧 dump 成 PNG 后逐张看过：缓冲区内容需要**逆时针转 90°**
-  才是"世界正立"（转完后显示器标题栏 `blecaco.png`、状态栏、任务栏文字全部可读）。
-- 硬件探针实测 `SENSOR_ORIENTATION = 90`（含义是"顺时针转 90° 才正立"）。
-- 这两条在"手机以自然朝向（竖屏）握持"的前提下**互相矛盾（差 180°）**，
-  说明中间还有一个没弄清的环节 —— 例如插件对 `rotation` 参数的处理方式、
-  或 App 是否锁定横屏导致"正立"的参照系不同。
+修正的关键差异（这些是「静止时位置指数发散」的**直接原因**）：
 
-**建议的定论方法（不靠猜）：**
+| 键 | 金标准 | 我们原来 | 后果 |
+| --- | --- | --- | --- |
+| `up_msckf_chi2_multipler` | 5 | 1 | 卡方门限紧 5 倍 → 视觉更新被大量拒绝 |
+| `up_msckf_sigma_px` | 2 | 1 | 残差归一化后更大 → 更易被拒 |
+| `up_slam_sigma_px` / `chi2` | 2 / 5 | 1 / 1 | 同上 |
+| `init_imu_thresh` | 0.4 | 1.5 | 阈值太松 → 手还在动就"初始化完成" |
+| `init_max_disparity` | 2.0 | 10.0 | 同上 |
+| `init_window_time` | 1.0 | 2.0 | — |
+| `init_max_features` | 25 | 50 | — |
+| `track_frequency` | 31.0 | 21.0 | 需与相机 ~30fps 匹配 |
+| `num_opencv_threads` | 1 | 4 | 手机上单线程更稳 |
+| `zupt_noise_multiplier` 等 | 50 / 1.5 / true | 10 / 0.5 / false | `try_zupt=false` 时不生效，纯对齐 |
 
-1. 让手机绕**光轴**（正对屏幕的方向）缓慢旋转 90°，同时对比
-   `[Orientation]` 送给 Blender 的**陀螺仪姿态** 与 `VioPose.quat` 的变化方向；
-   两者一致的那个候选就是对的。
-2. 或者更直接：沿手机 X 轴平移一段**量好的距离**（如 30 cm），
-   看 Blender 相机是否沿预期轴移动约同样的距离（错误的旋转会串轴）。
+**机制**：`chi2_multipler` 越小门限越窄、`sigma_px` 越小残差越大，
+两者叠加使几乎所有视觉更新被拒绝 → 滤波器退化成**纯 IMU 递推** →
+速度/位置指数发散，正好解释了观测到的现象。
 
-### 次高优先级：相机时间戳仍是"到达时刻"
+### 顺带确认的好消息
 
-`OpenVINS.gd._now_seconds()` 用的是 `SystemClock.elapsedRealtimeNanos()`，
-即在 **GDScript 收到帧时**取值，**不是** Camera2 的 `SENSOR_TIMESTAMP`（真实曝光时刻）。
+- **相机-IMU 外参我推导对了**：金标准里 `T_cam_imu` ≈ `[[0,-1,0],[-1,0,0],[0,0,-1]]`
+  （带 Kalibr 标定残差），与我们配置的 `T_imu_cam` 一致。
+- OpenVINS 的 `opencv_yaml_parse.h` **两种 key 都接受**且视为同一矩阵
+  （`T_cam_imu` ↔ `T_imu_cam` 互为 fallback），所以键名不影响结果。
+
+### 仍与金标准不同、且已知的一处
+
+金标准用 `Camera2ResView.kt` 里的 **`image.timestamp`（Camera2 SENSOR_TIMESTAMP，
+真实曝光时刻）**；我们用 GDScript 收到帧的**到达时刻**。
+这是唯一还没对齐的输入差异，见下一节。
+
+---
+
+## 3.1 剩余待办（按性价比排序）
+
+### ① 真实曝光时间戳（唯一的输入差异）
+
+`OpenVINS.gd._now_seconds()` 用 `SystemClock.elapsedRealtimeNanos()`，
+即 **GDScript 收到帧时**取值，**不是** `SENSOR_TIMESTAMP`。
 二者相差整个相机管线延迟，Xiaomi/MTK 上可能几十到上百毫秒且有抖动。
 
 - `calib_cam_timeoffset` 只能吸收**恒定**偏差，吸收不了抖动。
-- 想根治需要给 `NativeCameraPlugin` 打补丁，把 `SENSOR_TIMESTAMP` 透出来。
+- 想根治需要给 `NativeCameraPlugin` 打补丁把 `SENSOR_TIMESTAMP` 透出来。
   ⚠️ 目前 `addons/NativeCameraPlugin/` 里**只有 `bin/*.aar`，没有 Java 源码**，
   需要先拿到该插件的源码工程/仓库。
 
-### 其它待验证项
+### ② `timeshift_cam_imu` 初值
 
-- `kalibr_imucam_chain.yaml` 的**畸变系数全是 0**（radtan）。手机镜头边缘畸变不小，
-  可能影响几何一致性 → 可考虑填入典型初值，或让 `calib_cam_intrinsics` 更快收敛。
-- `p_CinI`（相机在 IMU 中的位置）仍是 0；真实值只有几毫米，影响较小。
+金标准是 `0.018778 s`（Kalibr 实测），我们是 `0.0`。
+**但金标准是配 SENSOR_TIMESTAMP 测的**，而我们的时间戳晚了一个管线延迟，
+两者不能直接照抄 → 先保持 0，等 ① 解决了再一起定。
+
+### ③ 畸变与内参
+
+- 金标准的畸变有真实值 `[0.0413, -0.0350, -0.0011, 0.0022]`，我们是全 0。
+  但那是**另一台手机**标出来的，直接抄未必对；我们保留自己的 HAL 内参 + 0 畸变，
+  依靠 `calib_cam_intrinsics: true` 在线估计。
+- 若 ① 之后仍有偏差，可考虑用 `app_kalibr/` 里的 Docker 流程给本机做一次 Kalibr 标定。
+
+### ④ 其它低优先级
+
+- `p_CinI` 平移（金标准实测 ~1e-5 m，实际就是 0，我们也是 0 ✅）
+- IMU 噪声：我们用 datasheet×10，金标准用 EuRoC 典型值；两者都在合理范围
+- `init_dyn_use=false`（静态初始化）是否适合手持场景
+
+### ⑤ 效率工具（可选，若要大规模调参再做）
+
+桥接层已具备录制能力（`OpenVINSBridge.setRecording(true)` → Kalibr 格式
+`cam0/*.png` + `imu0.csv`），但 `OpenVINS.gd` 没暴露。
+加一个「录制 + 回放」通道后，配置试验就能无人值守批量跑，
+不必每次都让你重新扫码、举手机。
 
 ---
 

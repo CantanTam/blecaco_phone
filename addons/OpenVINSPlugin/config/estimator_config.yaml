@@ -3,10 +3,13 @@
 # ============================================================
 # Blecaco 单目 VIO 估计器配置
 #
-# 由 OpenVINS 官方 euroc_mav 配置改编为「手机单目 + IMU」：
-#   - max_cameras: 1 / use_stereo: false
-#   - 开启在线标定（外参 / 内参 / 时间偏移）以吸收「未逐机标定」的残差
-#   - 静态初始化（举稳约 init_window_time 秒）
+# 改编自 OpenVINS 官方 euroc_mav 配置，并**逐项对齐**
+# `/home/one/open_vins_mobile/app_device/config/estimator_config.yaml`
+# —— 那份配置是本项目在真机上实测跑通（能初始化、能出轨迹）的金标准。
+#
+# ⚠️ 曾经踩过的坑：up_*_chi2_multipler 原来写成 1（金标准是 5）、
+#    up_*_sigma_px 写成 1（金标准是 2）。这两个值会让视觉更新的卡方门限
+#    过严 → 更新被大量拒绝 → 滤波器退化为纯 IMU 递推 → 静止时位置指数发散。
 #
 # 配套文件：kalibr_imu_chain.yaml / kalibr_imucam_chain.yaml（同目录）
 # ============================================================
@@ -37,22 +40,25 @@ feat_rep_msckf: "GLOBAL_3D"
 feat_rep_slam: "ANCHORED_MSCKF_INVERSE_DEPTH"
 feat_rep_aruco: "ANCHORED_MSCKF_INVERSE_DEPTH"
 
-# zero velocity update
+# zero velocity update（金标准值；try_zupt=false 时本来不生效）
 try_zupt: false
 zupt_chi2_multipler: 0
 zupt_max_velocity: 0.1
-zupt_noise_multiplier: 10
-zupt_max_disparity: 0.5
-zupt_only_at_beginning: false
+zupt_noise_multiplier: 50
+zupt_max_disparity: 1.5
+zupt_only_at_beginning: true
 
 # ==================================================================
 # 初始化：静态初始化（手机举稳）
+#
+# 这几个阈值必须**够严**：太松的话会在「手还在动」时误判为静止而完成初始化，
+# 初始化的姿态/速度就是错的，后面必然发散。
 # ==================================================================
 
-init_window_time: 2.0      # 收集初始化信息所需秒数（静止）
-init_imu_thresh: 1.5       # 加计方差阈值（检测"抖动"）
-init_max_disparity: 10.0   # 判定平台静止的最大视差（与分辨率相关）
-init_max_features: 50
+init_window_time: 1.0      # 收集初始化信息所需秒数（静止）
+init_imu_thresh: 0.4       # 加计方差阈值（检测"抖动"），越小越严
+init_max_disparity: 2.0    # 判定平台静止的最大视差，越小越严
+init_max_features: 25
 
 init_dyn_use: false        # 用静态初始化，不用动态（无需晃动手机）
 init_dyn_mle_opt_calib: false
@@ -91,9 +97,9 @@ grid_x: 5
 grid_y: 5
 min_px_dist: 10
 knn_ratio: 0.70
-track_frequency: 21.0
+track_frequency: 31.0      # 与相机 ~30fps 匹配（金标准值）
 downsample_cameras: false
-num_opencv_threads: 4
+num_opencv_threads: 1      # 手机上单线程反而更快/更少抢占（金标准值）
 histogram_method: "HISTOGRAM"
 
 use_aruco: false
@@ -101,15 +107,20 @@ num_aruco: 1024
 downsize_aruco: true
 
 # ==================================================================
-# 观测噪声
+# 观测噪声与卡方门限
+#
+# ⚠️⚠️ 这一组是「静止时位置指数发散」的直接原因：
+#   chi2_multipler 决定残差门限的宽窄，**值越大越宽松**。
+#   原来写成 1（比金标准紧 5 倍）、sigma_px 写成 1（残差被归一化得更大），
+#   两者叠加会让几乎所有视觉更新被拒绝 → 退化成纯 IMU 递推 → 发散。
 # ==================================================================
 
-up_msckf_sigma_px: 1
-up_msckf_chi2_multipler: 1
-up_slam_sigma_px: 1
-up_slam_chi2_multipler: 1
-up_aruco_sigma_px: 1
-up_aruco_chi2_multipler: 1
+up_msckf_sigma_px: 2
+up_msckf_chi2_multipler: 5
+up_slam_sigma_px: 2
+up_slam_chi2_multipler: 5
+up_aruco_sigma_px: 2
+up_aruco_chi2_multipler: 5
 
 use_mask: false
 
