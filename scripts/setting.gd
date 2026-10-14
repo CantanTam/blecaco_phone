@@ -86,6 +86,17 @@ func _finish_hide() -> void:
 	
 	
 func _on_mode_set_toggled(is_toggled: bool) -> void:
+	# 模式选择界面打开时，隐藏飞机模式触控区域
+	if active_mode_host != null:
+		var plane_forward_area := active_mode_host.find_child(
+			"PlaneForwardArea",
+			true,
+			false
+		) as Control
+
+		if plane_forward_area != null:
+			plane_forward_area.visible = not is_toggled
+			
 	for child in content_host.get_children():
 		child.queue_free()
 

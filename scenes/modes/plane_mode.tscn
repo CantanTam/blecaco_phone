@@ -1,7 +1,16 @@
 [gd_scene format=3 uid="uid://bpjpj7heoasc6"]
 
 [ext_resource type="Script" uid="uid://bd8hvpt18g7g8" path="res://scripts/modes/plane_mode.gd" id="1_6ev5v"]
+[ext_resource type="Script" uid="uid://bppvbf3bgy4xa" path="res://scripts/modes/plane_forward_area.gd" id="2_n2t7d"]
 [ext_resource type="Texture2D" uid="uid://6tvg6ixjdkwt" path="res://resources/plane_forward.svg" id="2_v5b1u"]
+[ext_resource type="Shader" uid="uid://b151oxp147mqy" path="res://resources/plane_mask.gdshader" id="3_g1exo"]
+[ext_resource type="Shader" uid="uid://cmd8mw3quq62e" path="res://resources/plane_touch_glow.gdshader" id="4_glow"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_n2t7d"]
+shader = ExtResource("3_g1exo")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_glow"]
+shader = ExtResource("4_glow")
 
 [node name="PlaneMode" type="Control" unique_id=311837689]
 layout_mode = 3
@@ -14,6 +23,7 @@ script = ExtResource("1_6ev5v")
 
 [node name="PlaneForwardArea" type="Control" parent="." unique_id=1488301361]
 layout_mode = 1
+anchors_preset = 3
 anchor_left = 1.0
 anchor_top = 1.0
 anchor_right = 1.0
@@ -22,8 +32,12 @@ offset_left = -420.0
 offset_top = -870.0
 offset_right = -120.0
 offset_bottom = -60.0
+grow_horizontal = 0
+grow_vertical = 0
+script = ExtResource("2_n2t7d")
 
-[node name="ColorRect" type="ColorRect" parent="PlaneForwardArea" unique_id=702632529]
+[node name="ForwardBottomColor" type="ColorRect" parent="PlaneForwardArea" unique_id=1629543392]
+material = SubResource("ShaderMaterial_n2t7d")
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -31,9 +45,21 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-color = Color(0, 0, 0, 0.14509805)
+color = Color(1, 1, 1, 0.11764706)
 
-[node name="TextureRect" type="TextureRect" parent="PlaneForwardArea" unique_id=1655695273]
+[node name="ForwardColor" type="ColorRect" parent="PlaneForwardArea" unique_id=702632529]
+visible = false
+material = SubResource("ShaderMaterial_glow")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="ForwardShape" type="TextureRect" parent="PlaneForwardArea" unique_id=1655695273]
+visible = false
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
