@@ -234,6 +234,66 @@ for (size_t idx = 0; idx < feat.second->timestamps.at(camid).size(); idx++) {   
    说明问题不在我们的胶水层；如果它稳，就继续逐项 diff。
 
 
+### 3.1.6 最终定位：视觉更新被整段跳过（`feats=0`）+ 结构性修法
+
+**证据链（全部来自 logcat，可用 `grep 'OpenVINS('` 复现）：**
+
+1. 初始化本身是**正确**的 —— OpenVINS 自己打印的第一步是准的：
+   ```
+   [init]: successful initialization in 0.0015 seconds
+   [init]: orientation = -0.6661,0.0142,-0.7457,0.0127   ← 手机平放屏幕朝上,178° 是对的
+   [init]: bias accel = -0.1353,0.0052,-0.0153           ← 偏置健康
+   [init]: velocity = 0,0,0 | position = 0,0,0
+   ```
+2. **但 `good_features_MSCKF` 全程为 0**：
+   ```
+   fed camera #3625 ts=... feats=0 dt_off=-0.0171 init=1
+   feats 分布: 0 → 433 次；非 0 仅零星(1,2,3,5,6,32)
+   ```
+   ⟹ **MSCKF 视觉更新从未参与，滤波器退化成纯 IMU 递推** → 静止时位置照样飞走。
+3. 排除项：
+   - `image received out of order` 警告 **0 次**（帧时间戳 0% 倒退，单调）
+   - `Propagator unable` 警告 **0 次**
+   - 传感器注册正常：`OpenVINSBridge` 的 accel+gyro 均 `samplingPeriod=2500us`（400 Hz），
+     与参考 App 完全一致
+4. 于是只剩 `VioManager.cpp:348` 那条：
+   ```cpp
+   // We can start processing things when we have at least 5 clones
+   if ((int)state->_clones_IMU.size() < std::min(state->_options.max_clone_size, 5)) {
+     PRINT_DEBUG("waiting for enough clone states...");
+     return;   // ← 不足 5 个 clone 就跳过整个更新
+   }
+   ```
+
+**根因：线程模型与 OpenVINS 的设计不符。**
+
+OpenVINS 上游（ROS 节点）是**单线程回调**：`feed_measurement_imu` 与
+`feed_measurement_camera` 都在同一个线程里调用
+`propagator->propagate_and_clone(state, …)`。
+
+我们却是：IMU 在专属 `OpenVINSImu` 线程（400 Hz）**直接**喂，
+相机在 C++ worker 线程同时喂 —— 两边并发操作 `state->_clones_IMU`
+与 IMU 缓冲，把 clone 列表搅坏 → 永远凑不满 5 个 →
+视觉更新全被跳过 → 重力级发散。**这也顺带解释了那个 Eigen 断言崩溃。**
+
+**已实施的修法**（`openvins_godot_bridge.cpp`）：
+
+- 新增 `imu_queue`（`ImuSample` 队列）；`nativeFeedImu` **只入队不再直接喂**
+- `processing_worker_thread` 每轮先把队列里的 IMU 按时间顺序
+  `feed_measurement_imu(...)`，**然后**才处理相机帧 —— 与相机同线程，
+  复刻上游的单线程语义
+- `latest_imu_timestamp` 改为**喂进去之后**才推进（否则相机会去传播一段
+  还没有 IMU 数据的时间）
+- worker 轮询间隔 100 ms → 10 ms，保证 IMU 及时进队列
+- `verbosity` 临时改为 `DEBUG`，这样如果仍失败就能看到
+  `waiting for enough clone states (%d of %d)` 这条原本被 INFO 级别吞掉的日志
+
+**仍未处理（需确认）**：`ov_core/src/feat/FeatureHelper.h` 里
+`compute_disparity` 的 Eigen 断言崩溃（上文 3.1.3②）。它属于**改动 vendored
+OpenVINS**，虽然只是加几行边界判断，但上次编辑被拒绝了，所以没有直接改。
+
+---
+
 ## 3.2 剩余待办（按性价比排序）
 
 ### ① 真实曝光时间戳（唯一的输入差异）

@@ -14,7 +14,7 @@
 # 配套文件：kalibr_imu_chain.yaml / kalibr_imucam_chain.yaml（同目录）
 # ============================================================
 
-verbosity: "INFO" # ALL, DEBUG, INFO, WARNING, ERROR, SILENT
+verbosity: "DEBUG" # ALL, DEBUG, INFO, WARNING, ERROR, SILENT
 
 use_fej: true
 integration: "rk4"
