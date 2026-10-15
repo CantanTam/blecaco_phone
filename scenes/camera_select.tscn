@@ -3,6 +3,7 @@
 [ext_resource type="Script" path="res://scripts/camera_select.gd" id="1_camsel"]
 [ext_resource type="Texture2D" uid="uid://dd3h7av6l8as4" path="res://resources/ActiveCamera.svg" id="2_active"]
 [ext_resource type="Texture2D" uid="uid://cnun8ngecumy6" path="res://resources/InactiveCamera.svg" id="3_inactive"]
+[ext_resource type="Script" path="res://scripts/touch_scroll.gd" id="4_touchscroll"]
 
 [sub_resource type="SystemFont" id="SystemFont_camsel"]
 font_names = PackedStringArray("Sans-Serif")
@@ -60,6 +61,7 @@ anchor_right = 0.75
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+script = ExtResource("4_touchscroll")
 
 [node name="CameraList" type="VBoxContainer" parent="SetScrollPage"]
 layout_mode = 2

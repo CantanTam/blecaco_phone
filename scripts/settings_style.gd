@@ -103,6 +103,12 @@ static func style_item_bg(item_bg: PanelContainer) -> void:
 	style.content_margin_right = VALUE_PADDING
 	style.content_margin_bottom = VALUE_PADDING
 
+	# ⚠️ 必须是 PASS 而不是 STOP：
+	#    STOP 会把触摸事件吃掉，外层的 ScrollContainer 收不到拖动 → 列表滑不动。
+	#    PASS = 自己照样收到（gui_input 还能用来判断点击）+ 同时传给父节点，
+	#    这样「点这一行」和「上下滑动列表」才能同时成立。
+	item_bg.mouse_filter = Control.MOUSE_FILTER_PASS
+
 
 ## 数值框（滑条行）：底色 + 圆角。
 ##

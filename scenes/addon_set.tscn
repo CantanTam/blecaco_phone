@@ -1,6 +1,7 @@
 [gd_scene format=3 uid="uid://qrfd0mqte51"]
 
 [ext_resource type="Script" uid="uid://bn6qx2tphjk5q" path="res://scripts/addon_set.gd" id="1_xx2wr"]
+[ext_resource type="Script" path="res://scripts/touch_scroll.gd" id="2_touchscroll"]
 
 [sub_resource type="SystemFont" id="SystemFont_1n66d"]
 font_names = PackedStringArray("Sans-Serif")
@@ -121,6 +122,7 @@ anchor_right = 0.75
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+script = ExtResource("2_touchscroll")
 
 [node name="SettingsList" type="VBoxContainer" parent="SetScrollPage" unique_id=650516454]
 layout_mode = 2

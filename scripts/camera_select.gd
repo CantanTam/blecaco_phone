@@ -35,6 +35,13 @@ const TEMPLATE_NAME := "CameraItem"
 ## 图标节点名
 const ICON_NAME := "CameraIcon"
 
+## 「点一下」的判定：按下到松开之间移动不超过这个距离（px）才算点击。
+## 超过就当成列表滚动，不切摄像机。
+const TAP_MAX_DISTANCE := 20.0
+
+## 记录按下位置用的 meta 名（挂在行上）
+const PRESS_POSITION_META := "press_position"
+
 
 @onready var camera_list: VBoxContainer = $SetScrollPage/CameraList
 # 路径：CameraSelect → ContentHost → Setting → ModeContainer → Main → Connection
@@ -153,14 +160,17 @@ func _add_row(template: Control, camera_name: String, is_active: bool) -> void:
 	if value_text != null:
 		value_text.text = camera_name
 
-	# 整行可点：点一下就切到这台摄像机
+	# 整行可点：点一下就切到这台摄像机。
+	# ⚠️ mouse_filter 由 SettingsStyle.style_item_bg() 设成 PASS ——
+	#    既能收到 gui_input，又不会挡住外层 ScrollContainer 的滑动。
 	var item_bg := row.find_child(
 		SettingsStyle.ITEM_BG_NAME, true, false
 	) as Control
 
 	if item_bg != null:
-		item_bg.mouse_filter = Control.MOUSE_FILTER_STOP
-		item_bg.gui_input.connect(_on_row_gui_input.bind(camera_name))
+		item_bg.gui_input.connect(
+			_on_row_gui_input.bind(camera_name, item_bg)
+		)
 
 
 # ============================================================
@@ -185,23 +195,70 @@ func _on_options_changed(a_key: String, _a_value: Variant) -> void:
 	_rebuild()
 
 
-## 点某一行的处理：请求 Blender 把它切成活动摄像机。
+## 行被点 / 被摸时的处理。
 ##
-## 只认「按下」那一下（手机上是触摸按下，PC 上是鼠标左键），
-## 松开 / 拖动不重复发。
-func _on_row_gui_input(event: InputEvent, camera_name: String) -> void:
-	var pressed := false
+## ⚠️ 只有「按下 → 松开之间几乎没移动」才算点击。
+##    列表能滑动之后，手指拖动会先经过行上；如果一按下就切摄像机，
+##    滑列表就会一路乱切。
+func _on_row_gui_input(
+	event: InputEvent,
+	camera_name: String,
+	item_bg: Control
+) -> void:
+	var position := Vector2.ZERO
+	var is_press := false
+	var is_release := false
 
 	if event is InputEventScreenTouch:
-		pressed = event.pressed
+		position = event.position
+		is_press = event.pressed
+		is_release = not event.pressed
 	elif event is InputEventMouseButton:
-		pressed = event.pressed and event.button_index == MOUSE_BUTTON_LEFT
+		# ⚠️ Android 上开着「触摸 → 鼠标」模拟时，一次点按会额外发一遍鼠标事件；
+		#    两条都处理的话点一次会切两次。模拟开着时只认触摸那条。
+		if Input.is_emulating_mouse_from_touch():
+			return
+
+		if event.button_index != MOUSE_BUTTON_LEFT:
+			return
+
+		position = event.position
+		is_press = event.pressed
+		is_release = not event.pressed
 	else:
 		return
 
-	if not pressed:
+	# ⚠️ 必须换算成**屏幕坐标**再比较：
+	#    gui_input 给的是控件局部坐标，而列表滑起来之后行会跟着手指一起移动，
+	#    局部坐标里手指几乎没动 → 拖动会被误判成「点一下」，滑列表就一路乱切。
+	var screen_position := (
+		item_bg.get_global_transform_with_canvas() * position
+	)
+
+	if is_press:
+		item_bg.set_meta(PRESS_POSITION_META, screen_position)
 		return
 
+	if not is_release:
+		return
+
+	var pressed_at: Variant = item_bg.get_meta(PRESS_POSITION_META, null)
+
+	if pressed_at == null:
+		return
+
+	# 移动超过阈值 → 这是在滑列表，不是点这一行
+	if (screen_position - (pressed_at as Vector2)).length() > TAP_MAX_DISTANCE:
+		return
+
+	_switch_to(camera_name)
+
+
+## 请求 Blender 把某台摄像机设为活动摄像机。
+##
+## 不在这里做乐观更新：Blender 处理完会把新的摄像机状态推回来
+## （见 blecaco/setting.py 的 _watch_state），页面收到再重建。
+func _switch_to(camera_name: String) -> void:
 	if connection == null:
 		push_warning("[CameraSelect] 找不到 Connection，无法切换摄像机")
 		return
