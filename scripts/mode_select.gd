@@ -51,7 +51,12 @@ func _ready() -> void:
 			push_error("[ModeSelect] 找不到卡片：" + cover_name)
 			continue
 
-		cover.self_modulate = Color(1.0, 1.0, 1.0, 0.0)
+		# ⚠️ 这一行原本是 Color(1,1,1,0)：把卡片自己的绘制（背景 + 光晕）整个藏掉，
+		#    只留里面的封面图。现在卡片要用自己那个「圆角白底 + 绿色光晕」，
+		#    所以必须让它可见。
+		#    注意 self_modulate 只影响卡片自身，**不会**动到子节点（封面图），
+		#    所以封面图依旧由下面的 modulate（亮度/透明度动画）控制。
+		cover.self_modulate = Color(1.0, 1.0, 1.0, 1.0)
 
 		var cover_image: TextureRect = cover.get_node_or_null(
 			"CoverImage"

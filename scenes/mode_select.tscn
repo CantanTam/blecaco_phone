@@ -8,6 +8,27 @@
 [ext_resource type="Texture2D" uid="uid://cf5xe046fh0ej" path="res://resources/CameraMode.svg" id="5_dxjqd"]
 [ext_resource type="Texture2D" uid="uid://rhxgb6wsi6ah" path="res://resources/DroneMode.svg" id="6_xuogk"]
 
+; 卡片外观：四个圆角 + 一圈绿色光晕。
+;
+; 卡片是白色的（图片本身就是白底），所以这里 bg_color 也用白色，
+; 它的作用有两个：
+;   1) 提供一个「圆角形状」给节点上的 clip_children 当遮罩，把图片裁成圆角
+;   2) 挡住阴影向内的那部分，只留外面一圈光晕
+;
+; ⚠️ bg_color 必须**不透明**：半透明的话阴影会从卡片内部透出来，整张卡变绿。
+; shadow_color = #00ff00ff；shadow_offset 为 0 即「居中放大」；
+; shadow_size 就是光晕向外扩散的厚度。
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_cover"]
+bg_color = Color(1, 1, 1, 1)
+corner_radius_top_left = 40
+corner_radius_top_right = 40
+corner_radius_bottom_right = 40
+corner_radius_bottom_left = 40
+corner_detail = 20
+shadow_color = Color(0, 1, 0, 1)
+shadow_size = 40
+shadow_offset = Vector2(0, 0)
+
 [node name="ModeSelect" type="Control" unique_id=1451242520]
 layout_mode = 3
 anchors_preset = 15
@@ -32,6 +53,8 @@ offset_left = 680.0
 offset_top = 180.0
 offset_right = 1240.0
 offset_bottom = 900.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_cover")
+clip_children = 2
 
 [node name="CoverImage" type="TextureRect" parent="CoverFlow/FreeCover" unique_id=1769396544]
 layout_mode = 1
@@ -51,6 +74,8 @@ offset_left = 380.0
 offset_top = 230.0
 offset_right = 840.0
 offset_bottom = 850.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_cover")
+clip_children = 2
 
 [node name="CoverImage" type="TextureRect" parent="CoverFlow/PlaneCover" unique_id=1808497069]
 layout_mode = 1
@@ -70,6 +95,8 @@ offset_left = 1080.0
 offset_top = 230.0
 offset_right = 1540.0
 offset_bottom = 850.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_cover")
+clip_children = 2
 
 [node name="CoverImage" type="TextureRect" parent="CoverFlow/CarCover" unique_id=805304523]
 layout_mode = 1
@@ -89,6 +116,8 @@ offset_left = 1380.0
 offset_top = 230.0
 offset_right = 1840.0
 offset_bottom = 850.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_cover")
+clip_children = 2
 
 [node name="CoverImage" type="TextureRect" parent="CoverFlow/GameCover" unique_id=1136624239]
 layout_mode = 1
@@ -107,6 +136,8 @@ offset_left = -80.0
 offset_top = 230.0
 offset_right = 380.0
 offset_bottom = 850.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_cover")
+clip_children = 2
 
 [node name="CoverImage" type="TextureRect" parent="CoverFlow/CameraCover" unique_id=963257979]
 layout_mode = 1
@@ -125,6 +156,8 @@ offset_left = 1580.0
 offset_top = 230.0
 offset_right = 2040.0
 offset_bottom = 850.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_cover")
+clip_children = 2
 
 [node name="CoverImage" type="TextureRect" parent="CoverFlow/DroneCover" unique_id=1832045069]
 layout_mode = 1
