@@ -34,24 +34,24 @@ extends Control
 @onready var qr_code: Control = get_node_or_null("../../QRCode") as Control
 
 # ============================================================
-# 选项按钮按下时，需要暂时隐藏的「模式触控区域」
+# OptionButtons 唤出时，把**当前模式场景**（*_mode.tscn）整体藏起来
 #
-# 这些区域属于当前模式场景（*_mode.tscn），运行时被实例化到
-# ActiveModeHost 下面，所以这里按 **节点名** 递归查找，不写死路径。
+# 模式场景运行时被实例化到 ActiveModeHost 下面，所以这里直接开关
+# ActiveModeHost 自己的显示，不再按节点名去逐个找触控区域：
+#     OptionButtons 唤出 → 整块淡出，动画结束后 visible = false
+#     面板收起          → 重新淡入
 #
-# ⚠️ 以后新增模式时**只改这个数组**即可：
-#    把你的 *_mode.tscn 里的触控区域节点名照样补一行，例如
-#        "DroneForwardArea",   # drone_mode.tscn
-#    名字必须与场景里的节点名完全一致；
-#    找不到的名字会被静默跳过（不报错，也不影响其它模式）。
+# ⚠️ 好处：以后新增模式**完全不用改代码**（旧写法要往一个名字数组里
+#    补一行，新模式的区域忘了补就一直失灵）。
+#
+# ⚠️ Stream 是 ActiveModeHost 的**兄弟节点**（都挂在 ModeContainer 下，
+#    Stream 排在更前面），所以藏模式场景不影响视频流 ——
+#    stream 照常可见，这是需求明确要求的。
+#
+# ⚠️ 为什么最后一定要真的 visible = false：modulate.a = 0 只是透明，
+#    visible 的 Control 依然会吃触摸事件，模式场景的触控区会抢走
+#    本该给设置界面的触摸。
 # ============================================================
-const HIDE_WHILE_OPTION_BUTTON_PRESSED: Array[String] = [
-	"PlaneForwardArea",  # plane_mode.tscn  飞机前进触控区
-	"CarForwardArea",    # car_mode.tscn    汽车前进触控区
-	# TODO: 以后新增的模式区域加在下面，例如：
-	# "DroneForwardArea",  # drone_mode.tscn
-	# "GameForwardArea",   # game_mode.tscn
-]
 
 const HIDDEN_TOP := -200.0
 const HIDDEN_BOTTOM := -10.0
@@ -76,13 +76,6 @@ func _ready() -> void:
 	top_edge_area.swipe_up.connect(_hide_option_panel)
 	mode_set_button.toggled.connect(_on_mode_set_toggled)
 	addon_set_button.toggled.connect(_on_addon_set_toggled)
-
-	# 统一接管 OptionButtons 下的**所有**按钮（不逐个写死名字）：
-	# 只要还有按钮处于按下状态就隐藏模式触控区域，全部松开就恢复显示。
-	# 这些按钮共用同一个 ButtonGroup，所以同一时刻最多只有一个被按下。
-	for child in option_buttons.get_children():
-		if child is Button:
-			(child as Button).toggled.connect(_on_option_button_toggled)
 
 	option_panel.visible = false
 	option_panel.modulate.a = 0.0
@@ -131,6 +124,15 @@ func _show_option_panel() -> void:
 	if blur_mask != null:
 		panel_tween.tween_property(blur_mask, "modulate:a", 1.0, ANIMATION_DURATION)
 
+	# 当前模式场景整体淡出（动画跑完由 _finish_show 置 visible = false）。
+	# 只藏它自己，兄弟节点 Stream 不受影响，视频流照常可见。
+	if active_mode_host != null:
+		panel_tween.tween_property(
+			active_mode_host, "modulate:a", 0.0, ANIMATION_DURATION
+		)
+
+	panel_tween.chain().tween_callback(Callable(self, "_finish_show"))
+
 
 func _hide_option_panel() -> void:
 	_stop_animation()
@@ -145,12 +147,30 @@ func _hide_option_panel() -> void:
 	if blur_mask != null:
 		panel_tween.tween_property(blur_mask, "modulate:a", 0.0, ANIMATION_DURATION)
 
+	# 模式场景重新淡入（先确保 visible，否则淡了也看不见）
+	if active_mode_host != null:
+		active_mode_host.visible = true
+
+		panel_tween.tween_property(
+			active_mode_host, "modulate:a", 1.0, ANIMATION_DURATION
+		)
+
 	panel_tween.chain().tween_callback(Callable(self, "_finish_hide"))
 
 
 func _stop_animation() -> void:
 	if panel_tween != null and panel_tween.is_running():
 		panel_tween.kill()
+
+
+## 面板唤出动画跑完（模式场景已经淡出）→ 把模式场景彻底置为不可见。
+##
+## 必须真的 visible = false：透明但 visible 的 Control 依然会吃触摸事件，
+## 模式场景的触控区会抢走本该给设置界面的触摸。
+## 只影响模式场景，Stream 是它的兄弟节点，一直可见。
+func _finish_show() -> void:
+	if active_mode_host != null:
+		active_mode_host.visible = false
 
 
 func _finish_hide() -> void:
@@ -166,15 +186,11 @@ func _finish_hide() -> void:
 
 	mode_set_button.set_pressed_no_signal(false)
 
-	# set_pressed_no_signal() 不会发出 toggled 信号，所以这里手动刷新一次
-	# 触控区域的显示状态（见 _refresh_mode_area_visibility 的说明）。
-	_refresh_mode_area_visibility()
-
 	print("[Setting] OptionPanel 已隐藏，设置界面已关闭")
 	
 	
 func _on_mode_set_toggled(is_toggled: bool) -> void:
-	# 模式触控区域的隐藏/恢复已经由 _on_option_button_toggled() 统一处理，
+	# 模式场景的隐藏/恢复由 _show_option_panel() / _finish_show() 统一处理，
 	# 这里只负责模式选择面板自己的内容。
 	for child in content_host.get_children():
 		child.queue_free()
@@ -238,9 +254,10 @@ func _on_mode_selected(scene_path: String) -> void:
 
 	mode_set_button.set_pressed_no_signal(false)
 
-	# 同上：无信号地改写了按下状态，必须手动刷新，
-	# 否则会停留在"按钮已松开、触控区域却还隐藏着"的状态。
-	_refresh_mode_area_visibility()
+	# 新实例化出来的模式场景默认是 visible 的，但这时面板还开着，
+	# 而 ActiveModeHost 已经被 _finish_show() 置成 visible = false，
+	# 子节点会跟着不显示，所以这里不用额外处理；
+	# 等面板收起时 _hide_option_panel() 会把整块淡入回来。
 
 	print("[Setting] 已切换模式：", scene_path)
 
@@ -269,63 +286,6 @@ func _on_addon_set_toggled(is_toggled: bool) -> void:
 
 	content_host.add_child(page)
 	print("[Setting] 已打开 AddonSet")
-
-
-# ============================================================
-# 选项按钮 ↔ 模式触控区域
-#
-# 需求：OptionButtons 里任意按钮**按下去**时，把当前模式的触控区域
-#      （如 PlaneForwardArea / CarForwardArea）隐藏起来，**松开**后再显示。
-# 原因：这些区域铺满屏幕下半部分，会抢走本该给选项按钮的触摸事件。
-#
-# 实现要点：这些按钮共用同一个 ButtonGroup（toggle_mode），所以
-# 「有没有按钮按着」只需要看是否还有 button_pressed 为 true 的按钮。
-# 这样无论以后 OptionButtons 里加多少按钮，都不用改下面的代码。
-# ============================================================
-
-
-## OptionButtons 里任意按钮的按下状态变化时调用。
-func _on_option_button_toggled(_is_toggled: bool) -> void:
-	_refresh_mode_area_visibility()
-
-
-## 重新计算并应用触控区域的显示状态。
-##
-## ⚠️ 一共有三个地方需要调用它：
-##   1) 任意选项按钮的 toggled 信号 → _on_option_button_toggled()
-##   2) 用 set_pressed_no_signal() 强制松开按钮之后
-##      （它**不发信号**，不手动刷新就会一直停在被隐藏的状态）
-##   3) 切换模式场景之后（新实例化出来的区域默认是 visible 的）
-func _refresh_mode_area_visibility() -> void:
-	_set_mode_areas_visible(not _is_any_option_button_pressed())
-
-
-## 是否还有任意一个选项按钮处于按下状态。
-func _is_any_option_button_pressed() -> bool:
-	for child in option_buttons.get_children():
-		if child is Button and (child as Button).button_pressed:
-			return true
-
-	return false
-
-
-## 显示 / 隐藏所有登记在 HIDE_WHILE_OPTION_BUTTON_PRESSED 里的触控区域。
-##
-## 按节点名在 ActiveModeHost 子树里递归查找，所以：
-##   - 不需要知道区域在当前模式场景里的层级
-##   - 当前模式没有的区域会被跳过（找到 null 就 continue），不会报错
-##   - 以后新增模式时，只要把区域节点名加进那个数组即可
-func _set_mode_areas_visible(should_show: bool) -> void:
-	if active_mode_host == null:
-		return
-
-	for area_name in HIDE_WHILE_OPTION_BUTTON_PRESSED:
-		var area := active_mode_host.find_child(area_name, true, false) as Control
-
-		if area == null:
-			continue
-
-		area.visible = should_show
 
 
 # ============================================================
@@ -448,6 +408,9 @@ func _on_qr_visibility_changed() -> void:
 		if child is Button:
 			(child as Button).set_pressed_no_signal(false)
 
-	_refresh_mode_area_visibility()
+	# 面板是被强制收起的，不走淡入动画 —— 模式场景立刻恢复可见
+	if active_mode_host != null:
+		active_mode_host.visible = true
+		active_mode_host.modulate.a = 1.0
 
 	print("[Setting] 二维码页面出现，已立刻收起设置界面")
