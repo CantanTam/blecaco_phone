@@ -88,7 +88,8 @@ const DEFAULTS := {
 	# ------------------------------------------------------------
 	"blender/fps": 10.0,
 	"blender/quality": 70.0,
-	"blender/smooth": 0.0
+	# 默认值与 addon_property.py 里 props.smooth 的 default 保持一致
+	"blender/smooth": 0.5
 }
 
 # 运行期的实际取值（_load 时以 DEFAULTS 为底，再用存档覆盖）

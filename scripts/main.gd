@@ -1,5 +1,21 @@
 extends Control
 
+# Blender 推来的 setting 名 → 本机 Options 的键。
+# 收到之后就写进 Options，而不是让各模式各自监听：
+# 模式场景是连接成功之后才加载的，Blender 的推送可能早于它，
+# 放在 main（常驻）里收下，模式启动时直接读就行。
+#
+#   output_fps  场景输出帧率（决定手机发送频率 / 前进步长）
+#   fps         推流帧率 ┐
+#   quality     推流画质 ├ 手机连上时的「校准」用，见 addon_set.gd
+#   smooth      平滑程度 ┘
+const BLENDER_SETTING_KEYS := {
+	"output_fps": "blender/output_fps",
+	"fps": "blender/fps",
+	"quality": "blender/quality",
+	"smooth": "blender/smooth",
+}
+
 @onready var qr_code = $QRCode
 @onready var stream = $Stream
 @onready var connection = $Connection
@@ -15,10 +31,8 @@ func _ready() -> void:
 	stream.visible = false
 
 
-# Blender 推来的设置（目前只有输出帧率）。
-# 在这里接收并写进 Options，而不是让各模式各自监听：
-# 模式场景是连接成功之后才加载的，Blender 的推送可能早于它，
-# 放在 main（常驻）里收下，模式启动时直接读就行。
+# Blender 推来的设置（output_fps + 三个推流参数）。
+# 见文件开头 BLENDER_SETTING_KEYS 的说明。
 func _on_text_message_received(message: String) -> void:
 	var data: Variant = JSON.parse_string(message)
 
@@ -28,18 +42,28 @@ func _on_text_message_received(message: String) -> void:
 	if data.get("type") != "setting":
 		return
 
-	if data.get("name") != "output_fps":
+	var setting_name := str(data.get("name", ""))
+
+	if not BLENDER_SETTING_KEYS.has(setting_name):
 		return
 
-	var fps: float = float(data.get("value", 0.0))
+	var raw: Variant = data.get("value")
 
-	if fps <= 0.0:
+	if not (raw is float or raw is int):
 		return
 
-	# 只更新内存，不落盘：这个值只对当前连接的那台 Blender 有效
-	Options.set_value("blender/output_fps", fps, false)
+	var value := float(raw)
+	var key: String = BLENDER_SETTING_KEYS[setting_name]
 
-	print("[Main] Blender 输出帧率同步：", fps, " fps")
+	# output_fps 是「时间轴每秒前进几帧」，0 或负数没有意义
+	if setting_name == "output_fps" and value <= 0.0:
+		return
+
+	# ⚠️ 只更新内存，不落盘：这几个值以当前连的那台 Blender 为准，
+	#    下次连上还会被重新校准一次（见 addon_set.gd 的 Options.changed 处理）。
+	Options.set_value(key, value, false)
+
+	print("[Main] Blender 同步 %s = %s" % [setting_name, str(value)])
 
 
 func _on_qr_scanned(url: String) -> void:
