@@ -26,6 +26,11 @@ var selected_cover_name: String = "FreeCover"
 var current_mode_scene_path: String = ""
 var cover_animation_running: bool = false
 
+## 切换封面期间先把光晕藏起来。
+## 否则光晕会跟着那张正在移动 / 缩放的卡片一路走，看着像残影；
+## 等整个切换动画（含最后的居中放大）结束再恢复。
+var _cover_glow_suppressed: bool = false
+
 ## 卡片样式盒（圆角白卡，所有卡片共用）。
 ## 外观参数在 scripts/mode_cover_style.gd；光晕不在这里，见 _update_cover_glow。
 var _cover_style: StyleBoxFlat
@@ -141,8 +146,15 @@ func _process(_delta: float) -> void:
 ##
 ## ⚠️ 每帧都做：切换选中时卡片是 tween 放大 / 移动的，光晕必须跟着一起走。
 ##    只有选中那张有光晕 —— 找不到选中卡片时整个隐藏。
+##
+## ⚠️ 切换封面期间整个不显示（_cover_glow_suppressed）：那时候卡片正在移动，
+##    光晕跟着走会像残影；等动画结束再让它出现在新的选中卡片上。
 func _update_cover_glow() -> void:
 	if cover_glow == null:
+		return
+
+	if _cover_glow_suppressed:
+		cover_glow.visible = false
 		return
 
 	var cover: Control = cover_flow.get_node_or_null(
@@ -301,7 +313,17 @@ func _on_cover_gui_input(
 	print("[ModeSelect] 滚动到中央：", cover_name)
 
 	cover_animation_running = true
+
+	# 切换一开始就把光晕藏掉（整个切换动画期间都不显示，见 _cover_glow_suppressed）
+	_cover_glow_suppressed = true
+	_update_cover_glow()
+
 	await _animate_to_cover(cover_name)
+
+	# 动画（含最后的居中放大）结束 → 光晕出现在新的选中卡片上
+	_cover_glow_suppressed = false
+	_update_cover_glow()
+
 	cover_animation_running = false
 
 	print("[ModeSelect] 已居中：", cover_name)
