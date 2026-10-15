@@ -64,9 +64,14 @@ const DEFAULTS := {
 	# 选项面板唤出时，背后那层「半透明 + 模糊」遮罩
 	# （shader: resources/ui_blur_mask.gdshader，由 setting.gd 写入）
 	#
-	# 手机端要调的就是这三个值 —— 调完发 Options.changed，
+	# 糊的是 stream + 当前模式画面；RecordButton / LinkButton /
+	# OptionButtons / OptionButtons 唤出的其它 .tscn 都在模糊层之上，保持清晰。
+	#
+	# 手机端要调的就是下面这两个值 —— 调完发 Options.changed，
 	# setting.gd::_on_option_changed() 会立刻写进 shader，实时生效。
 	# 设置页做好后各挂一个滑条 / 步进器即可。
+	# ⚠️ 改这里的默认值后如果没生效：存档会盖掉默认值，先删
+	#    user://blecaco_settings.cfg 或调用 Options.reset_to_defaults()。
 	# ------------------------------------------------------------
 	"blur_mask/opacity": 0.45,   # 半透明程度 0.0~1.0（0=完全透出画面，1=完全被遮罩色盖住）
 	"blur_mask/radius": 10.0,    # 模糊半径，单位「屏幕像素」（0=不糊，越大越糊）

@@ -146,6 +146,28 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
+; 选项面板唤出时盖在 stream 上的「半透明 + 模糊」遮罩。
+; ⚠️ 这两个节点的位置 = 绘制顺序，决定了哪一层被糊，不要随便挪：
+;     排在它们**前面**的（Stream / ActiveModeHost）会被糊；
+;     排在它们**后面**的（RecordButton / LinkButton / Setting，
+;     以及 Setting 里打开的其它 .tscn）保持清晰；
+;     QRCode 是 Main 的最后一个子节点，永远在最上层，不受影响。
+; 参数由 scripts/setting.gd 从 Options 读取后写进 material
+; （不要写 shader_parameter/xxx 到这里，会覆盖 shader 默认值）。
+[node name="BlurBackBuffer" type="BackBufferCopy" parent="ModeContainer"]
+copy_mode = 2
+
+[node name="BlurMask" type="ColorRect" parent="ModeContainer"]
+visible = false
+material = SubResource("ShaderMaterial_blurmask")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
 [node name="RecordButton" type="Button" parent="ModeContainer" unique_id=786424927]
 layout_mode = 1
 offset_left = 40.0
@@ -185,20 +207,6 @@ script = ExtResource("5_a8y0u")
 
 [node name="Setting" parent="ModeContainer" unique_id=2009646776 instance=ExtResource("4_tbgi4")]
 layout_mode = 1
-mouse_filter = 2
-
-[node name="BlurBackBuffer" type="BackBufferCopy" parent="ModeContainer/Setting"]
-copy_mode = 2
-
-[node name="BlurMask" type="ColorRect" parent="ModeContainer/Setting"]
-visible = false
-material = SubResource("ShaderMaterial_blurmask")
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
 mouse_filter = 2
 
 [node name="TopEdgeArea" type="Control" parent="ModeContainer/Setting" unique_id=1278452578]

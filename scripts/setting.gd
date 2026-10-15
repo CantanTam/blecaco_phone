@@ -9,10 +9,22 @@ extends Control
 @onready var option_buttons: HBoxContainer = $OptionPanel/ButtonMargins/OptionButtons
 @onready var mode_set_button: Button = $OptionPanel/ButtonMargins/OptionButtons/ModeSetButton
 @onready var addon_set_button: Button = $OptionPanel/ButtonMargins/OptionButtons/AddonSetButton
+# ============================================================
 # 选项面板唤出时，盖在 stream 上面的「半透明 + 模糊」遮罩
-# （节点在 scenes/main.tscn 里，是 Setting 的子节点，排在 OptionPanel 之前；
-#   shader 是 resources/ui_blur_mask.gdshader）
-@onready var blur_mask: ColorRect = $BlurMask
+#
+# shader:   resources/ui_blur_mask.gdshader
+# 节点位置: scenes/main.tscn 的 **ModeContainer** 下面，是 Setting 的**兄弟节点**，
+#           排在 ActiveModeHost 之后、RecordButton 之前。
+#
+# ⚠️ 位置 = 绘制顺序，它决定了「谁被糊、谁保持清晰」，不要随便挪：
+#     排在它**前面**的  Stream / ActiveModeHost                 → 被糊
+#     排在它**后面**的  RecordButton / LinkButton / Setting     → 清晰
+#       （Setting 里含 OptionPanel、OptionButtons，以及 OptionButtons
+#        唤出的其它 .tscn —— 它们挂在 Setting/ContentHost 下面，所以也在
+#        模糊层之上）
+#     QRCode 是 Main 的最后一个子节点，永远在最上层 → 完全不受影响
+# ============================================================
+@onready var blur_mask: ColorRect = get_node_or_null("../BlurMask") as ColorRect
 
 # ============================================================
 # 选项按钮按下时，需要暂时隐藏的「模式触控区域」
@@ -70,8 +82,10 @@ func _ready() -> void:
 
 	# 模糊遮罩：初始隐藏；参数先按 Options 里的值写一次，
 	# 之后手机上改了值会走 Options.changed → _on_option_changed()
-	blur_mask.visible = false
-	blur_mask.modulate.a = 0.0
+	if blur_mask != null:
+		blur_mask.visible = false
+		blur_mask.modulate.a = 0.0
+
 	_apply_mask_params()
 	Options.changed.connect(_on_option_changed)
 
@@ -89,8 +103,12 @@ func _show_option_panel() -> void:
 
 	option_panel.visible = true
 
-	# 背后那层模糊遮罩：先显示出来，再和面板一起淡入
-	blur_mask.visible = true
+	# 背后那层模糊遮罩：先显示出来，再和面板一起淡入。
+	# 它盖住 stream 和模式场景，但盖不住 RecordButton / LinkButton /
+	# OptionPanel 以及 OptionButtons 唤出的其它 .tscn（见文件开头说明）。
+	if blur_mask != null:
+		blur_mask.visible = true
+
 	_apply_mask_params()
 
 	panel_tween = create_tween()
@@ -99,7 +117,9 @@ func _show_option_panel() -> void:
 	panel_tween.tween_property(option_panel, "offset_top", SHOWN_TOP, ANIMATION_DURATION)
 	panel_tween.tween_property(option_panel, "offset_bottom", SHOWN_BOTTOM, ANIMATION_DURATION)
 	panel_tween.tween_property(option_panel, "modulate:a", 1.0, ANIMATION_DURATION)
-	panel_tween.tween_property(blur_mask, "modulate:a", 1.0, ANIMATION_DURATION)
+
+	if blur_mask != null:
+		panel_tween.tween_property(blur_mask, "modulate:a", 1.0, ANIMATION_DURATION)
 
 
 func _hide_option_panel() -> void:
@@ -111,7 +131,9 @@ func _hide_option_panel() -> void:
 	panel_tween.tween_property(option_panel, "offset_top", HIDDEN_TOP, ANIMATION_DURATION)
 	panel_tween.tween_property(option_panel, "offset_bottom", HIDDEN_BOTTOM, ANIMATION_DURATION)
 	panel_tween.tween_property(option_panel, "modulate:a", 0.0, ANIMATION_DURATION)
-	panel_tween.tween_property(blur_mask, "modulate:a", 0.0, ANIMATION_DURATION)
+
+	if blur_mask != null:
+		panel_tween.tween_property(blur_mask, "modulate:a", 0.0, ANIMATION_DURATION)
 
 	panel_tween.chain().tween_callback(Callable(self, "_finish_hide"))
 
@@ -126,7 +148,8 @@ func _finish_hide() -> void:
 
 	# 遮罩的淡出已经由 _hide_option_panel() 的 tween 做完，这里彻底关掉
 	# （visible=false 之后这一层就不再产生绘制开销）
-	blur_mask.visible = false
+	if blur_mask != null:
+		blur_mask.visible = false
 
 	for child in content_host.get_children():
 		child.queue_free()
@@ -298,9 +321,14 @@ func _set_mode_areas_visible(should_show: bool) -> void:
 # ============================================================
 # 背景模糊遮罩（resources/ui_blur_mask.gdshader）
 #
+# 作用范围：盖住 stream 和当前模式画面，但**不**影响
+#           RecordButton / LinkButton / OptionPanel（含 OptionButtons）
+#           以及 OptionButtons 唤出的其它 .tscn。
+#           （靠节点绘制顺序实现，详见文件开头 blur_mask 的说明）
+#
 # 三个参数都存在 Options 里（登记在 options.gd 的 DEFAULTS）：
-#   "blur_mask/opacity"    半透明程度  0.0 ~ 1.0
-#   "blur_mask/radius"     模糊半径    单位 = 屏幕像素
+#   "blur_mask/opacity"    半透明程度  0.0 ~ 1.0        ← 手机上调「半透明」
+#   "blur_mask/radius"     模糊半径    单位 = 屏幕像素   ← 手机上调「模糊程度」
 #   "blur_mask/ring_taps"  采样圈数    1 ~ 4（性能 vs 平滑度）
 #
 # 【手机上想调怎么办】
@@ -309,13 +337,16 @@ func _set_mode_areas_visible(should_show: bool) -> void:
 #       Options.set_value("blur_mask/radius", slider.value)
 #   写入会广播 Options.changed → 下面的 _on_option_changed() 立刻把新值
 #   塞进 shader，不需要重启、不用重建场景。
-#   临时试验也可以直接在 options.gd 的 DEFAULTS 里改默认值。
+#
+#   ⚠️ 临时试验时如果直接改 options.gd 的 DEFAULTS 却发现没效果：
+#      存档里的旧值会盖掉默认值。先删掉 user://blecaco_settings.cfg，
+#      或者调用一次 Options.reset_to_defaults()。
 #
 #   另外两个不在 Options 里、需要改代码的参数：
 #     遮罩颜色 mask_color —— 在 .gdshader 文件里改
 #     遮罩覆盖范围       —— 由 main.tscn 里 BlurMask 节点的锚点决定
-#                          （现在是全屏；只想盖住面板附近就把它改成和
-#                          OptionPanel 一样的锚点/offset）
+#                          （现在是全屏；想让画面某一块保持清晰就缩小它。
+#                          注意它只决定「哪些像素被糊」，面板永远在最上层）
 # ============================================================
 
 
