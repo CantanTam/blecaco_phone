@@ -37,6 +37,25 @@ extends Control
 @onready var qr_code: Control = get_node_or_null("../../QRCode") as Control
 
 # ============================================================
+# 按下这些按钮时不显示模糊遮罩
+#
+# 它们打开的都是「要看着背后的画面来操作」的页面（挑摄像机 / 调阴影 / 看预览），
+# 压一层模糊反而看不清背景。面板和页面照常，只是把遮罩关掉。
+#
+# ⚠️ 模式触控区不受影响：面板一唤出，整个 *_mode.tscn 就已经隐藏了
+#    （见文件开头 ActiveModeHost 那段说明），所以那些 *Area 本来就是隐藏的。
+#
+# 名字要和 OptionButtons 下的节点名一致；找不到的会被静默跳过。
+# ============================================================
+const NO_BLUR_BUTTONS: Array[String] = [
+	"ActiveCameSetButton",  # 摄像机选择页（camera_select.tscn）
+	"CameraSetButton",      # 摄像机设置页（待做）
+	"ShadeSetButton",       # 阴影设置页（待做）
+	"PreviewSetButton",     # 预览设置页（待做）
+	# TODO: 以后新增这类页面，把按钮名加在这里
+]
+
+# ============================================================
 # OptionButtons 唤出时，把**当前模式场景**（*_mode.tscn）整体藏起来
 #
 # 模式场景运行时被实例化到 ActiveModeHost 下面，所以这里直接开关
@@ -81,6 +100,19 @@ func _ready() -> void:
 	addon_set_button.toggled.connect(_on_addon_set_toggled)
 	active_came_set_button.toggled.connect(_on_active_came_set_toggled)
 
+	# 上面那几个「不要模糊」的按钮：按下/松开时重新决定遮罩要不要显示
+	for button_name in NO_BLUR_BUTTONS:
+		var button := option_buttons.get_node_or_null(button_name) as Button
+
+		if button == null:
+			push_warning(
+				"[Setting] OptionButtons 里找不到 %s，NO_BLUR_BUTTONS 跳过它"
+				% button_name
+			)
+			continue
+
+		button.toggled.connect(_on_no_blur_button_toggled)
+
 	option_panel.visible = false
 	option_panel.modulate.a = 0.0
 
@@ -112,10 +144,10 @@ func _show_option_panel() -> void:
 
 	option_panel.visible = true
 
-	# 背后那层模糊遮罩：先显示出来（**并同时开启抓屏**），再和面板一起淡入。
-	# 它盖住 stream 和模式场景，但盖不住 RecordButton / LinkButton /
-	# OptionPanel 以及 OptionButtons 唤出的其它 .tscn（见文件开头说明）。
-	_set_mask_active(true)
+	# 背后那层模糊遮罩：先决定要不要显示（按着「不要模糊」的按钮时不显示），
+	# 再和面板一起淡入。它盖住 stream 和模式场景，但盖不住
+	# RecordButton / LinkButton / OptionPanel 以及唤出的页面（见文件开头说明）。
+	_refresh_blur_mask()
 	_apply_mask_params()
 
 	panel_tween = create_tween()
@@ -390,8 +422,39 @@ func _on_option_changed(a_key: String, _a_value: Variant) -> void:
 	_apply_mask_params()
 
 
-## 统一开关「模糊遮罩 + 抓屏」这一层。
+## 按下 / 松开 NO_BLUR_BUTTONS 里的按钮时调用：重新决定遮罩要不要显示。
+func _on_no_blur_button_toggled(_is_toggled: bool) -> void:
+	_refresh_blur_mask()
+
+
+## 重新决定模糊遮罩要不要显示。
 ##
+##   面板没打开                        → 不显示
+##   面板开着，但按着「不要模糊」的按钮 → 不显示（面板和页面照常）
+##   其余情况                          → 显示
+##
+## ⚠️ 这里直接开 / 关，不走淡入淡出：面板那串 tween 正在动 blur_mask 的 alpha，
+##    再叠一个 tween 会互相打架。
+func _refresh_blur_mask() -> void:
+	if not option_panel.visible:
+		_set_mask_active(false)
+		return
+
+	_set_mask_active(not _is_any_no_blur_button_pressed())
+
+
+## 是否按着 NO_BLUR_BUTTONS 里的任意一个按钮。
+func _is_any_no_blur_button_pressed() -> bool:
+	for button_name in NO_BLUR_BUTTONS:
+		var button := option_buttons.get_node_or_null(button_name) as Button
+
+		if button != null and button.button_pressed:
+			return true
+
+	return false
+
+
+## 统一开关「模糊遮罩 + 抓屏」这一层。
 ## ⚠️ 为什么不能只改 blur_mask.visible —— BackBufferCopy 是**全场景生效**的：
 ##    只要它处于启用状态，之后所有用到 hint_screen_texture 的 shader 都会
 ##    采到这块 back buffer。而二维码页面的 Mask shader
