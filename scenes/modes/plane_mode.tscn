@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" uid="uid://bd8hvpt18g7g8" path="res://scripts/modes/plane_mode.gd" id="1_6ev5v"]
 [ext_resource type="Script" uid="uid://bppvbf3bgy4xa" path="res://scripts/modes/plane_forward_area.gd" id="2_n2t7d"]
-[ext_resource type="Texture2D" uid="uid://6tvg6ixjdkwt" path="res://resources/plane_forward.svg" id="2_v5b1u"]
+[ext_resource type="Texture2D" uid="uid://c2kt4a84s5cya" path="res://resources/ForwardBackward.svg" id="2_v5b1u"]
 [ext_resource type="Shader" uid="uid://b151oxp147mqy" path="res://resources/plane_mask.gdshader" id="3_g1exo"]
 [ext_resource type="Shader" uid="uid://cmd8mw3quq62e" path="res://resources/plane_touch_glow.gdshader" id="4_glow"]
 

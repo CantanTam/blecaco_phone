@@ -186,7 +186,7 @@ func _process(delta: float) -> void:
 	# 正数 → Blender 沿相机局部 -Z 前飞；负数 → 沿 +Z 后退。
 	var forward_distance := _forward_step() * (
 		_current_speed
-		* maxf(0.0, Options.get_float("plane/plane_speed"))
+		* maxf(0.0, Options.get_float("move_speed"))
 	)
 
 	var plane_data: Dictionary = {

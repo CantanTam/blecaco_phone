@@ -18,7 +18,7 @@ extends Control
 
 # 形状遮罩：两个材质共用同一张图
 @export var mask_texture: Texture2D = preload(
-	"res://resources/plane_forward.svg"
+	"res://resources/ForwardBackward.svg"
 )
 
 # 指尖光晕圆（ForwardColor）

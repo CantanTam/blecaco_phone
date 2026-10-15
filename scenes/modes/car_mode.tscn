@@ -1,5 +1,24 @@
 [gd_scene format=3 uid="uid://chwwjtcwwdfnt"]
 
+[ext_resource type="Script" uid="uid://d3eticfsg8pq2" path="res://scripts/modes/car_mode.gd" id="1_car"]
+[ext_resource type="Script" uid="uid://01cukajgvf7s" path="res://scripts/modes/car_forward_area.gd" id="2_forward"]
+[ext_resource type="Texture2D" uid="uid://c2kt4a84s5cya" path="res://resources/ForwardBackward.svg" id="3_texture"]
+[ext_resource type="Shader" uid="uid://b151oxp147mqy" path="res://resources/plane_mask.gdshader" id="4_mask"]
+[ext_resource type="Shader" uid="uid://cmd8mw3quq62e" path="res://resources/plane_touch_glow.gdshader" id="5_glow"]
+
+[sub_resource type="ShaderMaterial" id="CarMaskMaterial"]
+shader = ExtResource("4_mask")
+shader_parameter/mask_texture = ExtResource("3_texture")
+
+[sub_resource type="ShaderMaterial" id="CarGlowMaterial"]
+shader = ExtResource("5_glow")
+shader_parameter/circle_color = Color(1, 1, 1, 1)
+shader_parameter/circle_size = 200.0
+shader_parameter/gradient_start = 0.0
+shader_parameter/mask_texture = ExtResource("3_texture")
+shader_parameter/node_size = Vector2(1, 1)
+shader_parameter/circle_center = Vector2(0, 0)
+
 [node name="CarMode" type="Control" unique_id=311837689]
 layout_mode = 3
 anchors_preset = 15
@@ -8,15 +27,52 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
+script = ExtResource("1_car")
 
-[node name="ColorRect" type="ColorRect" parent="." unique_id=184718875]
+[node name="CarForwardArea" type="Control" parent="." unique_id=1927693416]
 layout_mode = 1
-anchors_preset = -1
-anchor_left = 0.25
-anchor_top = 0.25
-anchor_right = 0.75
-anchor_bottom = 0.75
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -420.0
+offset_top = -870.0
+offset_right = -120.0
+offset_bottom = -60.0
+grow_horizontal = 0
+grow_vertical = 0
+script = ExtResource("2_forward")
+
+[node name="ForwardBottomColor" type="ColorRect" parent="CarForwardArea" unique_id=748593531]
+material = SubResource("CarMaskMaterial")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-color = Color(0.44313726, 0, 0.76862746, 0.4862745)
+color = Color(1, 1, 1, 0.11764706)
+
+[node name="ForwardColor" type="ColorRect" parent="CarForwardArea" unique_id=1317753331]
+visible = false
+material = SubResource("CarGlowMaterial")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="ForwardShape" type="TextureRect" parent="CarForwardArea" unique_id=1099012935]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("3_texture")

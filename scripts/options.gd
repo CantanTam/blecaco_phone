@@ -49,7 +49,7 @@ const DEFAULT_MODE_SCENE := MODE_SCENES["FreeCover"]
 # ------------------------------------------------------------
 const DEFAULTS := {
 	"mode/scene_path": DEFAULT_MODE_SCENE,
-	"plane/plane_speed": 1.0,
+	"move_speed": 1.0,
 	# 例外项：这不是「用户选项」，而是 Blender 运行时同步过来的状态
 	# （插件在客户端接入/帧率变化时推送 setting/output_fps，见 main.gd）。
 	# 放在这里只为让各模式有统一的读取入口，不进设置界面、不参与持久化。

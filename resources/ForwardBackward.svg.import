@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://6tvg6ixjdkwt"
-path="res://.godot/imported/plane_forward.svg-aa098f78f19f6b60ef1018398fb089cf.ctex"
+uid="uid://c2kt4a84s5cya"
+path="res://.godot/imported/ForwardBackward.svg-6c41f632f8cb810dbaca9105204f8674.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://resources/plane_forward.svg"
-dest_files=["res://.godot/imported/plane_forward.svg-aa098f78f19f6b60ef1018398fb089cf.ctex"]
+source_file="res://resources/ForwardBackward.svg"
+dest_files=["res://.godot/imported/ForwardBackward.svg-6c41f632f8cb810dbaca9105204f8674.ctex"]
 
 [params]
 
