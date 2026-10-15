@@ -1,18 +1,121 @@
 [gd_scene format=3 uid="uid://qrfd0mqte51"]
 
+[ext_resource type="Script" uid="uid://bn6qx2tphjk5q" path="res://scripts/addon_set.gd" id="1_xx2wr"]
+
+[sub_resource type="SystemFont" id="SystemFont_1n66d"]
+font_names = PackedStringArray("Sans-Serif")
+
+[sub_resource type="SystemFont" id="SystemFont_ytxg7"]
+
+; SpeedInput（MoveSpeedRow/SpeedInput，类型是 SpinBox）的文字框圆角。
+; SpinBox 内部是一个 LineEdit，它的外观来自 LineEdit 的 stylebox，
+; 所以这里覆盖 LineEdit/styles/* —— 数值照抄 Godot 默认主题，
+; 只把 corner_radius 从 3 改成 30。
+; ⚠️ 想改圆角大小，改下面三个 StyleBoxFlat 里的
+;    corner_radius_top_left / top_right / bottom_right / bottom_left 四个值即可。
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_speed_normal"]
+content_margin_left = 4.0
+content_margin_top = 4.0
+content_margin_right = 4.0
+content_margin_bottom = 4.0
+bg_color = Color(0.1, 0.1, 0.1, 0.6)
+border_width_bottom = 2
+border_color = Color(0, 0, 0, 0.6)
+corner_radius_top_left = 30
+corner_radius_top_right = 30
+corner_radius_bottom_right = 30
+corner_radius_bottom_left = 30
+corner_detail = 20
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_speed_focus"]
+content_margin_left = 4.0
+content_margin_top = 4.0
+content_margin_right = 4.0
+content_margin_bottom = 4.0
+draw_center = false
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.8, 0.8, 0.8, 1)
+corner_radius_top_left = 30
+corner_radius_top_right = 30
+corner_radius_bottom_right = 30
+corner_radius_bottom_left = 30
+corner_detail = 20
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_speed_read_only"]
+content_margin_left = 4.0
+content_margin_top = 4.0
+content_margin_right = 4.0
+content_margin_bottom = 4.0
+bg_color = Color(0.1, 0.1, 0.1, 0.3)
+border_width_bottom = 2
+border_color = Color(0, 0, 0, 0.3)
+corner_radius_top_left = 30
+corner_radius_top_right = 30
+corner_radius_bottom_right = 30
+corner_radius_bottom_left = 30
+corner_detail = 20
+
+[sub_resource type="Theme" id="Theme_xx2wr"]
+default_font = SubResource("SystemFont_ytxg7")
+default_font_size = 50
+LineEdit/styles/normal = SubResource("StyleBoxFlat_speed_normal")
+LineEdit/styles/focus = SubResource("StyleBoxFlat_speed_focus")
+LineEdit/styles/read_only = SubResource("StyleBoxFlat_speed_read_only")
+
 [node name="AddonSet" type="Control" unique_id=1767232535]
 layout_mode = 3
-anchors_preset = 15
 anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = 50.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_xx2wr")
+
+[node name="SetScrollPage" type="ScrollContainer" parent="." unique_id=1772711897]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.25
+anchor_right = 0.75
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="ColorRect" type="ColorRect" parent="." unique_id=1175301865]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-color = Color(0.581033, 0.58103293, 0.5810329, 0.37254903)
+[node name="SettingsList" type="VBoxContainer" parent="SetScrollPage" unique_id=650516454]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="MoveSpeedRow" type="HBoxContainer" parent="SetScrollPage/SettingsList" unique_id=776120980]
+custom_minimum_size = Vector2(0, 180)
+layout_mode = 2
+theme_override_constants/separation = 25
+
+[node name="SpeedLabel" type="Label" parent="SetScrollPage/SettingsList/MoveSpeedRow" unique_id=354484819]
+custom_minimum_size = Vector2(220, 80)
+layout_mode = 2
+theme_override_fonts/font = SubResource("SystemFont_1n66d")
+theme_override_font_sizes/font_size = 50
+text = "移动倍数"
+horizontal_alignment = 2
+vertical_alignment = 1
+
+[node name="SpeedInput" type="SpinBox" parent="SetScrollPage/SettingsList/MoveSpeedRow" unique_id=722869608]
+layout_mode = 2
+size_flags_horizontal = 3
+theme = SubResource("Theme_xx2wr")
+theme_override_colors/up_icon_modulate = Color(0.8745098, 0.8745098, 0.8745098, 0)
+theme_override_colors/up_hover_icon_modulate = Color(0.9490196, 0.9490196, 0.9490196, 0)
+theme_override_colors/up_pressed_icon_modulate = Color(1, 1, 1, 0)
+theme_override_colors/up_disabled_icon_modulate = Color(0.8745098, 0.8745098, 0.8745098, 0)
+theme_override_colors/down_icon_modulate = Color(0.8745098, 0.8745098, 0.8745098, 0)
+theme_override_colors/down_hover_icon_modulate = Color(0.9490196, 0.9490196, 0.9490196, 0)
+theme_override_colors/down_pressed_icon_modulate = Color(0.9490196, 0.9490196, 0.9490196, 0)
+theme_override_colors/down_disabled_icon_modulate = Color(0.8745098, 0.8745098, 0.8745098, 0)
+theme_override_constants/field_and_buttons_separation = 0
+theme_override_constants/buttons_width = 0
+theme_override_constants/set_min_buttons_width_from_icons = 0
+min_value = 0.01
+value = 1.01
+alignment = 1
