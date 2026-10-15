@@ -65,6 +65,20 @@ LineEdit/styles/normal = SubResource("StyleBoxFlat_speed_normal")
 LineEdit/styles/focus = SubResource("StyleBoxFlat_speed_focus")
 LineEdit/styles/read_only = SubResource("StyleBoxFlat_speed_read_only")
 
+; 每行的背景 ItemBg。数值只是「脚本没跑之前的默认外观」——
+; 真正的样式由 scripts/addon_set.gd 顶部的统一样式变量在 _ready() 里写进来。
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_itembg"]
+content_margin_left = 10.0
+content_margin_top = 10.0
+content_margin_right = 10.0
+content_margin_bottom = 10.0
+bg_color = Color(1, 1, 1, 0.5)
+corner_radius_top_left = 30
+corner_radius_top_right = 30
+corner_radius_bottom_right = 30
+corner_radius_bottom_left = 30
+corner_detail = 20
+
 [node name="AddonSet" type="Control" unique_id=1767232535]
 layout_mode = 3
 anchor_right = 1.0
@@ -90,9 +104,18 @@ size_flags_horizontal = 3
 [node name="MoveSpeedRow" type="HBoxContainer" parent="SetScrollPage/SettingsList" unique_id=776120980]
 custom_minimum_size = Vector2(0, 180)
 layout_mode = 2
+
+[node name="ItemBg" type="PanelContainer" parent="SetScrollPage/SettingsList/MoveSpeedRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBoxFlat_itembg")
+
+[node name="RowContent" type="HBoxContainer" parent="SetScrollPage/SettingsList/MoveSpeedRow/ItemBg"]
+layout_mode = 2
+size_flags_horizontal = 3
 theme_override_constants/separation = 25
 
-[node name="SpeedLabel" type="Label" parent="SetScrollPage/SettingsList/MoveSpeedRow" unique_id=354484819]
+[node name="SpeedLabel" type="Label" parent="SetScrollPage/SettingsList/MoveSpeedRow/ItemBg/RowContent" unique_id=354484819]
 custom_minimum_size = Vector2(220, 80)
 layout_mode = 2
 theme_override_fonts/font = SubResource("SystemFont_1n66d")
@@ -101,7 +124,7 @@ text = "移动倍数"
 horizontal_alignment = 2
 vertical_alignment = 1
 
-[node name="SpeedInput" type="SpinBox" parent="SetScrollPage/SettingsList/MoveSpeedRow" unique_id=722869608]
+[node name="SpeedInput" type="SpinBox" parent="SetScrollPage/SettingsList/MoveSpeedRow/ItemBg/RowContent" unique_id=722869608]
 layout_mode = 2
 size_flags_horizontal = 3
 theme = SubResource("Theme_xx2wr")
