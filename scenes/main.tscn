@@ -16,6 +16,13 @@
 [ext_resource type="Texture2D" uid="uid://bl55j1x1x4gr0" path="res://resources/PreviewSet.svg" id="11_jbj1t"]
 [ext_resource type="Shader" uid="uid://clp8vrn6oy56" path="res://resources/ui_blur_mask.gdshader" id="12_blur"]
 
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_blurmask"]
+shader = ExtResource("12_blur")
+shader_parameter/blur_radius = 10.0
+shader_parameter/mask_opacity = 0.45
+shader_parameter/mask_color = Color(0.03, 0.03, 0.05, 1)
+shader_parameter/ring_taps = 2
+
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_qnk50"]
 bg_color = Color(1, 1, 1, 1)
 corner_radius_top_left = 60
@@ -110,9 +117,6 @@ corner_detail = 20
 [sub_resource type="ButtonGroup" id="ButtonGroup_6hbff"]
 allow_unpress = true
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_blurmask"]
-shader = ExtResource("12_blur")
-
 [node name="Main" type="Control" unique_id=1033142112]
 layout_mode = 3
 anchors_preset = 15
@@ -146,18 +150,10 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-; 选项面板唤出时盖在 stream 上的「半透明 + 模糊」遮罩。
-; ⚠️ 这两个节点的位置 = 绘制顺序，决定了哪一层被糊，不要随便挪：
-;     排在它们**前面**的（Stream / ActiveModeHost）会被糊；
-;     排在它们**后面**的（RecordButton / LinkButton / Setting，
-;     以及 Setting 里打开的其它 .tscn）保持清晰；
-;     QRCode 是 Main 的最后一个子节点，永远在最上层，不受影响。
-; 参数由 scripts/setting.gd 从 Options 读取后写进 material
-; （不要写 shader_parameter/xxx 到这里，会覆盖 shader 默认值）。
-[node name="BlurBackBuffer" type="BackBufferCopy" parent="ModeContainer"]
-copy_mode = 2
+[node name="BlurBackBuffer" type="BackBufferCopy" parent="ModeContainer" unique_id=1014693883]
+copy_mode = 0
 
-[node name="BlurMask" type="ColorRect" parent="ModeContainer"]
+[node name="BlurMask" type="ColorRect" parent="ModeContainer" unique_id=939590900]
 visible = false
 material = SubResource("ShaderMaterial_blurmask")
 layout_mode = 1

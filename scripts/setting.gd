@@ -25,6 +25,13 @@ extends Control
 #     QRCode 是 Main 的最后一个子节点，永远在最上层 → 完全不受影响
 # ============================================================
 @onready var blur_mask: ColorRect = get_node_or_null("../BlurMask") as ColorRect
+# ⚠️ 抓屏节点：**必须和遮罩同开同关**，见 _set_mask_active() 的说明。
+@onready var blur_back_buffer: BackBufferCopy = (
+	get_node_or_null("../BlurBackBuffer") as BackBufferCopy
+)
+# 二维码页面。它一出现就说明还没扫码 / 掉线了，此时要立刻收起设置界面，
+# 否则它的 Mask shader（也用 hint_screen_texture）会采到我们的遮罩。
+@onready var qr_code: Control = get_node_or_null("../../QRCode") as Control
 
 # ============================================================
 # 选项按钮按下时，需要暂时隐藏的「模式触控区域」
@@ -80,14 +87,19 @@ func _ready() -> void:
 	option_panel.visible = false
 	option_panel.modulate.a = 0.0
 
-	# 模糊遮罩：初始隐藏；参数先按 Options 里的值写一次，
-	# 之后手机上改了值会走 Options.changed → _on_option_changed()
+	# 模糊遮罩：初始隐藏，并且**同时把抓屏也关掉**（原因见 _set_mask_active）。
+	# 参数先按 Options 里的值写一次，之后手机上改了值会走
+	# Options.changed → _on_option_changed()，实时生效。
 	if blur_mask != null:
-		blur_mask.visible = false
 		blur_mask.modulate.a = 0.0
 
+	_set_mask_active(false)
 	_apply_mask_params()
 	Options.changed.connect(_on_option_changed)
+
+	# 二维码页面（还没扫码 / 掉线）出现时立刻收起设置界面
+	if qr_code != null:
+		qr_code.visibility_changed.connect(_on_qr_visibility_changed)
 
 
 func send_setting(setting_name: String, value: Variant) -> void:
@@ -103,12 +115,10 @@ func _show_option_panel() -> void:
 
 	option_panel.visible = true
 
-	# 背后那层模糊遮罩：先显示出来，再和面板一起淡入。
+	# 背后那层模糊遮罩：先显示出来（**并同时开启抓屏**），再和面板一起淡入。
 	# 它盖住 stream 和模式场景，但盖不住 RecordButton / LinkButton /
 	# OptionPanel 以及 OptionButtons 唤出的其它 .tscn（见文件开头说明）。
-	if blur_mask != null:
-		blur_mask.visible = true
-
+	_set_mask_active(true)
 	_apply_mask_params()
 
 	panel_tween = create_tween()
@@ -146,10 +156,10 @@ func _stop_animation() -> void:
 func _finish_hide() -> void:
 	option_panel.visible = false
 
-	# 遮罩的淡出已经由 _hide_option_panel() 的 tween 做完，这里彻底关掉
-	# （visible=false 之后这一层就不再产生绘制开销）
-	if blur_mask != null:
-		blur_mask.visible = false
+	# 遮罩的淡出已经由 _hide_option_panel() 的 tween 做完，这里彻底关掉。
+	# ⚠️ _set_mask_active(false) 会**同时关掉抓屏**，这一步必须做，
+	#    否则二维码页面外围会被我们这块 back buffer 影响（见其说明）。
+	_set_mask_active(false)
 
 	for child in content_host.get_children():
 		child.queue_free()
@@ -383,3 +393,61 @@ func _on_option_changed(a_key: String, _a_value: Variant) -> void:
 		return
 
 	_apply_mask_params()
+
+
+## 统一开关「模糊遮罩 + 抓屏」这一层。
+##
+## ⚠️ 为什么不能只改 blur_mask.visible —— BackBufferCopy 是**全场景生效**的：
+##    只要它处于启用状态，之后所有用到 hint_screen_texture 的 shader 都会
+##    采到这块 back buffer。而二维码页面的 Mask shader
+##    （resources/qrcode.gdshader）正是用它来做外围那圈「模糊背景」的，
+##    所以抓屏一开，二维码页面的外观就被改掉了。
+##
+##    实测（1920x1080，逐像素比对，二维码页面外围同一点）：
+##      copy_mode = VIEWPORT (2)  → 0.133
+##      copy_mode = DISABLED (0)  → 0.082
+##    其中 DISABLED 的结果与「场景里根本没有这个节点」**逐像素完全一致**。
+##    因此默认必须是 DISABLED，只在遮罩真要显示时才切成 VIEWPORT。
+func _set_mask_active(active: bool) -> void:
+	if blur_mask != null:
+		blur_mask.visible = active
+
+	if blur_back_buffer != null:
+		blur_back_buffer.copy_mode = (
+			BackBufferCopy.COPY_MODE_VIEWPORT
+			if active
+			else BackBufferCopy.COPY_MODE_DISABLED
+		)
+
+
+## 二维码页面显示 / 隐藏时调用。
+##
+## 还没扫码、或 Blender 掉线时，二维码页面会重新出现。此时如果设置界面
+## （连同遮罩和抓屏）还开着，二维码页面外围就会采到遮罩，外观被改掉 ——
+## 所以这里**立刻**收起设置界面（不走 0.25s 动画，避免中间有几十毫秒的错位）。
+func _on_qr_visibility_changed() -> void:
+	if qr_code == null or not qr_code.visible:
+		return
+
+	if not option_panel.visible:
+		return
+
+	_stop_animation()
+
+	option_panel.visible = false
+	option_panel.modulate.a = 0.0
+	option_panel.offset_top = HIDDEN_TOP
+	option_panel.offset_bottom = HIDDEN_BOTTOM
+
+	_set_mask_active(false)
+
+	for child in content_host.get_children():
+		child.queue_free()
+
+	for child in option_buttons.get_children():
+		if child is Button:
+			(child as Button).set_pressed_no_signal(false)
+
+	_refresh_mode_area_visibility()
+
+	print("[Setting] 二维码页面出现，已立刻收起设置界面")
