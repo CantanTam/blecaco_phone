@@ -9,6 +9,10 @@ extends Control
 @onready var option_buttons: HBoxContainer = $OptionPanel/ButtonMargins/OptionButtons
 @onready var mode_set_button: Button = $OptionPanel/ButtonMargins/OptionButtons/ModeSetButton
 @onready var addon_set_button: Button = $OptionPanel/ButtonMargins/OptionButtons/AddonSetButton
+# 选项面板唤出时，盖在 stream 上面的「半透明 + 模糊」遮罩
+# （节点在 scenes/main.tscn 里，是 Setting 的子节点，排在 OptionPanel 之前；
+#   shader 是 resources/ui_blur_mask.gdshader）
+@onready var blur_mask: ColorRect = $BlurMask
 
 # ============================================================
 # 选项按钮按下时，需要暂时隐藏的「模式触控区域」
@@ -64,6 +68,13 @@ func _ready() -> void:
 	option_panel.visible = false
 	option_panel.modulate.a = 0.0
 
+	# 模糊遮罩：初始隐藏；参数先按 Options 里的值写一次，
+	# 之后手机上改了值会走 Options.changed → _on_option_changed()
+	blur_mask.visible = false
+	blur_mask.modulate.a = 0.0
+	_apply_mask_params()
+	Options.changed.connect(_on_option_changed)
+
 
 func send_setting(setting_name: String, value: Variant) -> void:
 	if connection == null:
@@ -78,12 +89,17 @@ func _show_option_panel() -> void:
 
 	option_panel.visible = true
 
+	# 背后那层模糊遮罩：先显示出来，再和面板一起淡入
+	blur_mask.visible = true
+	_apply_mask_params()
+
 	panel_tween = create_tween()
 	panel_tween.set_parallel(true)
 
 	panel_tween.tween_property(option_panel, "offset_top", SHOWN_TOP, ANIMATION_DURATION)
 	panel_tween.tween_property(option_panel, "offset_bottom", SHOWN_BOTTOM, ANIMATION_DURATION)
 	panel_tween.tween_property(option_panel, "modulate:a", 1.0, ANIMATION_DURATION)
+	panel_tween.tween_property(blur_mask, "modulate:a", 1.0, ANIMATION_DURATION)
 
 
 func _hide_option_panel() -> void:
@@ -95,6 +111,7 @@ func _hide_option_panel() -> void:
 	panel_tween.tween_property(option_panel, "offset_top", HIDDEN_TOP, ANIMATION_DURATION)
 	panel_tween.tween_property(option_panel, "offset_bottom", HIDDEN_BOTTOM, ANIMATION_DURATION)
 	panel_tween.tween_property(option_panel, "modulate:a", 0.0, ANIMATION_DURATION)
+	panel_tween.tween_property(blur_mask, "modulate:a", 0.0, ANIMATION_DURATION)
 
 	panel_tween.chain().tween_callback(Callable(self, "_finish_hide"))
 
@@ -106,6 +123,10 @@ func _stop_animation() -> void:
 
 func _finish_hide() -> void:
 	option_panel.visible = false
+
+	# 遮罩的淡出已经由 _hide_option_panel() 的 tween 做完，这里彻底关掉
+	# （visible=false 之后这一层就不再产生绘制开销）
+	blur_mask.visible = false
 
 	for child in content_host.get_children():
 		child.queue_free()
@@ -272,3 +293,62 @@ func _set_mode_areas_visible(should_show: bool) -> void:
 			continue
 
 		area.visible = should_show
+
+
+# ============================================================
+# 背景模糊遮罩（resources/ui_blur_mask.gdshader）
+#
+# 三个参数都存在 Options 里（登记在 options.gd 的 DEFAULTS）：
+#   "blur_mask/opacity"    半透明程度  0.0 ~ 1.0
+#   "blur_mask/radius"     模糊半径    单位 = 屏幕像素
+#   "blur_mask/ring_taps"  采样圈数    1 ~ 4（性能 vs 平滑度）
+#
+# 【手机上想调怎么办】
+#   改 Options 里这三个值即可，例如设置页放三个滑条：
+#       Options.set_value("blur_mask/opacity", slider.value)
+#       Options.set_value("blur_mask/radius", slider.value)
+#   写入会广播 Options.changed → 下面的 _on_option_changed() 立刻把新值
+#   塞进 shader，不需要重启、不用重建场景。
+#   临时试验也可以直接在 options.gd 的 DEFAULTS 里改默认值。
+#
+#   另外两个不在 Options 里、需要改代码的参数：
+#     遮罩颜色 mask_color —— 在 .gdshader 文件里改
+#     遮罩覆盖范围       —— 由 main.tscn 里 BlurMask 节点的锚点决定
+#                          （现在是全屏；只想盖住面板附近就把它改成和
+#                          OptionPanel 一样的锚点/offset）
+# ============================================================
+
+
+## 把 Options 里的参数写进遮罩的 ShaderMaterial。
+## ⚠️ 参数一律在这里设置，**不要**写进 .tscn 的 shader_parameter/xxx ——
+##    那会覆盖 shader 文件里的默认值，以后改 shader 就不生效了。
+func _apply_mask_params() -> void:
+	if blur_mask == null:
+		return
+
+	var mask_material := blur_mask.material as ShaderMaterial
+
+	if mask_material == null:
+		push_warning("[Setting] BlurMask 上没有 ShaderMaterial")
+		return
+
+	mask_material.set_shader_parameter(
+		"mask_opacity",
+		Options.get_float("blur_mask/opacity")
+	)
+	mask_material.set_shader_parameter(
+		"blur_radius",
+		Options.get_float("blur_mask/radius")
+	)
+	mask_material.set_shader_parameter(
+		"ring_taps",
+		Options.get_int("blur_mask/ring_taps")
+	)
+
+
+## Options 里任意选项变化时调用；只关心遮罩那三个。
+func _on_option_changed(a_key: String, _a_value: Variant) -> void:
+	if not a_key.begins_with("blur_mask/"):
+		return
+
+	_apply_mask_params()
