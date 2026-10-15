@@ -1,0 +1,124 @@
+[gd_scene format=3 uid="uid://bcam0select01"]
+
+[ext_resource type="Script" path="res://scripts/camera_select.gd" id="1_camsel"]
+[ext_resource type="Texture2D" uid="uid://dd3h7av6l8as4" path="res://resources/ActiveCamera.svg" id="2_active"]
+[ext_resource type="Texture2D" uid="uid://cnun8ngecumy6" path="res://resources/InactiveCamera.svg" id="3_inactive"]
+
+[sub_resource type="SystemFont" id="SystemFont_camsel"]
+font_names = PackedStringArray("Sans-Serif")
+
+; 行背景 ItemBg。默认值只是「脚本没跑之前的兜底」，
+; 真正的样式由 scripts/settings_style.gd 在 _ready() 里写进来。
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_itembg"]
+content_margin_left = 10.0
+content_margin_top = 10.0
+content_margin_right = 10.0
+content_margin_bottom = 10.0
+bg_color = Color(1, 1, 1, 0.5)
+corner_radius_top_left = 30
+corner_radius_top_right = 30
+corner_radius_bottom_right = 30
+corner_radius_bottom_left = 30
+corner_detail = 20
+
+; 右侧数值框：既是底色，也是裁切里面滑条的遮罩（节点上 clip_children = 2）
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_valuebox"]
+bg_color = Color(0.1, 0.1, 0.1, 0.6)
+corner_radius_top_left = 30
+corner_radius_top_right = 30
+corner_radius_bottom_right = 30
+corner_radius_bottom_left = 30
+corner_detail = 20
+
+; 滑条：轨道不画东西（draw_center = false），填充段才是滑条本体；
+; 圆角靠 ValueBox 的 clip_children 裁出来，所以这里不设圆角。
+; content_margin_top/bottom 决定高度（80 + 80 = 撑满行高 180 - 上下各 10）。
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_slider"]
+content_margin_top = 80.0
+content_margin_bottom = 80.0
+draw_center = false
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_slider_fill"]
+content_margin_top = 80.0
+content_margin_bottom = 80.0
+bg_color = Color(0, 1, 0, 1)
+
+[node name="CameraSelect" type="Control"]
+layout_mode = 3
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = 50.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_camsel")
+
+[node name="SetScrollPage" type="ScrollContainer" parent="."]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.25
+anchor_right = 0.75
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="CameraList" type="VBoxContainer" parent="SetScrollPage"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="CameraItem" type="HBoxContainer" parent="SetScrollPage/CameraList"]
+visible = false
+custom_minimum_size = Vector2(0, 180)
+layout_mode = 2
+
+[node name="ItemBg" type="PanelContainer" parent="SetScrollPage/CameraList/CameraItem"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBoxFlat_itembg")
+
+[node name="RowContent" type="HBoxContainer" parent="SetScrollPage/CameraList/CameraItem/ItemBg"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 25
+
+[node name="CameraIcon" type="TextureRect" parent="SetScrollPage/CameraList/CameraItem/ItemBg/RowContent"]
+custom_minimum_size = Vector2(220, 80)
+layout_mode = 2
+texture = ExtResource("2_active")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="ValueBox" type="Panel" parent="SetScrollPage/CameraList/CameraItem/ItemBg/RowContent"]
+clip_children = 2
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_valuebox")
+
+[node name="CameraSlider" type="HSlider" parent="SetScrollPage/CameraList/CameraItem/ItemBg/RowContent/ValueBox"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_styles/slider = SubResource("StyleBoxFlat_slider")
+theme_override_styles/grabber_area = SubResource("StyleBoxFlat_slider_fill")
+theme_override_styles/grabber_area_highlight = SubResource("StyleBoxFlat_slider_fill")
+max_value = 1.0
+step = 1.0
+alignment = 1
+
+[node name="ValueText" type="Label" parent="SetScrollPage/CameraList/CameraItem/ItemBg/RowContent/ValueBox/CameraSlider"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_fonts/font = SubResource("SystemFont_camsel")
+theme_override_font_sizes/font_size = 50
+text = "Camera"
+horizontal_alignment = 1
+vertical_alignment = 1

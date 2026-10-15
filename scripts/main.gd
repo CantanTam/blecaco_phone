@@ -14,6 +14,7 @@ const BLENDER_SETTING_KEYS := {
 	"fps": "blender/fps",
 	"quality": "blender/quality",
 	"smooth": "blender/smooth",
+	"cameras": "blender/cameras",
 }
 
 @onready var qr_code = $QRCode
@@ -48,12 +49,25 @@ func _on_text_message_received(message: String) -> void:
 		return
 
 	var raw: Variant = data.get("value")
+	var key: String = BLENDER_SETTING_KEYS[setting_name]
+
+	# 摄像机状态是个字典：{"active": 活动摄像机名, "names": [名字...]}
+	# 由 camera_select.gd 读出来渲染成列表（见那边的说明）。
+	if raw is Dictionary:
+		Options.set_value(key, raw, false)
+		print(
+			"[Main] Blender 同步摄像机：%s 台，活动 = %s"
+			% [
+				str((raw as Dictionary).get("names", []).size()),
+				str((raw as Dictionary).get("active", ""))
+			]
+		)
+		return
 
 	if not (raw is float or raw is int):
 		return
 
 	var value := float(raw)
-	var key: String = BLENDER_SETTING_KEYS[setting_name]
 
 	# output_fps 是「时间轴每秒前进几帧」，0 或负数没有意义
 	if setting_name == "output_fps" and value <= 0.0:

@@ -89,7 +89,11 @@ const DEFAULTS := {
 	"blender/fps": 10.0,
 	"blender/quality": 70.0,
 	# 默认值与 addon_property.py 里 props.smooth 的 default 保持一致
-	"blender/smooth": 0.5
+	"blender/smooth": 0.5,
+	# 摄像机状态（Blender 推来的运行时状态，同样不落盘）：
+	#     {"active": 活动摄像机名, "names": [名字...]}
+	# 由 camera_select.gd 读取并渲染成列表。
+	"blender/cameras": {}
 }
 
 # 运行期的实际取值（_load 时以 DEFAULTS 为底，再用存档覆盖）

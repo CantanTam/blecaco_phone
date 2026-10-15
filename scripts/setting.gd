@@ -9,6 +9,9 @@ extends Control
 @onready var option_buttons: HBoxContainer = $OptionPanel/ButtonMargins/OptionButtons
 @onready var mode_set_button: Button = $OptionPanel/ButtonMargins/OptionButtons/ModeSetButton
 @onready var addon_set_button: Button = $OptionPanel/ButtonMargins/OptionButtons/AddonSetButton
+@onready var active_came_set_button: Button = (
+	$OptionPanel/ButtonMargins/OptionButtons/ActiveCameSetButton
+)
 # ============================================================
 # 选项面板唤出时，盖在 stream 上面的「半透明 + 模糊」遮罩
 #
@@ -76,6 +79,7 @@ func _ready() -> void:
 	top_edge_area.swipe_up.connect(_hide_option_panel)
 	mode_set_button.toggled.connect(_on_mode_set_toggled)
 	addon_set_button.toggled.connect(_on_addon_set_toggled)
+	active_came_set_button.toggled.connect(_on_active_came_set_toggled)
 
 	option_panel.visible = false
 	option_panel.modulate.a = 0.0
@@ -286,6 +290,37 @@ func _on_addon_set_toggled(is_toggled: bool) -> void:
 
 	content_host.add_child(page)
 	print("[Setting] 已打开 AddonSet")
+
+
+## 点 ActiveCameSetButton 时调用：把 camera_select.tscn 实例化到 ContentHost 下面。
+##
+## 和 _on_addon_set_toggled 一样 —— 这些按钮共用一个 ButtonGroup，
+## 所以按下这个会自动松开其它按钮，那边清空 content_host 的行会先跑，
+## 这里再加新页面，同一时刻只有一个页面在。
+func _on_active_came_set_toggled(is_toggled: bool) -> void:
+	for child in content_host.get_children():
+		child.queue_free()
+
+	if not is_toggled:
+		print("[Setting] 已关闭 CameraSelect")
+		return
+
+	var packed_scene := load(
+		"res://scenes/camera_select.tscn"
+	) as PackedScene
+
+	if packed_scene == null:
+		push_error("[Setting] 找不到 camera_select.tscn")
+		return
+
+	var page := packed_scene.instantiate() as Control
+
+	if page == null:
+		push_error("[Setting] camera_select.tscn 的根节点必须是 Control")
+		return
+
+	content_host.add_child(page)
+	print("[Setting] 已打开 CameraSelect")
 
 
 # ============================================================
