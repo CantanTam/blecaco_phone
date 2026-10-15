@@ -8,16 +8,14 @@
 [ext_resource type="Texture2D" uid="uid://cf5xe046fh0ej" path="res://resources/CameraMode.svg" id="5_dxjqd"]
 [ext_resource type="Texture2D" uid="uid://rhxgb6wsi6ah" path="res://resources/DroneMode.svg" id="6_xuogk"]
 
-; 卡片外观：四个圆角 + 一圈绿色光晕。
+; 卡片外观（脚本没跑之前的兜底 / 编辑器预览用）：四个圆角的白卡。
 ;
-; 卡片是白色的（图片本身就是白底），所以这里 bg_color 也用白色，
-; 它的作用有两个：
-;   1) 提供一个「圆角形状」给节点上的 clip_children 当遮罩，把图片裁成圆角
-;   2) 挡住阴影向内的那部分，只留外面一圈光晕
+; ⚠️ 真正的样式由 scripts/mode_cover_style.gd 在运行时套上（统一入口）：
+;      选中 / 中间高亮放大的那张 → 带一圈绿色光晕
+;      其它卡片                   → 只有圆角，没有光晕
 ;
-; ⚠️ bg_color 必须**不透明**：半透明的话阴影会从卡片内部透出来，整张卡变绿。
-; shadow_color = #00ff00ff；shadow_offset 为 0 即「居中放大」；
-; shadow_size 就是光晕向外扩散的厚度。
+; 圆角本身要靠节点上的 clip_children 用它当遮罩，把封面图裁成四角圆角
+;（所有卡片都是这个效果）；底色必须不透明，否则光晕会从卡片内部透出来。
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_cover"]
 bg_color = Color(1, 1, 1, 1)
 corner_radius_top_left = 40
@@ -25,9 +23,6 @@ corner_radius_top_right = 40
 corner_radius_bottom_right = 40
 corner_radius_bottom_left = 40
 corner_detail = 20
-shadow_color = Color(0, 1, 0, 1)
-shadow_size = 40
-shadow_offset = Vector2(0, 0)
 
 [node name="ModeSelect" type="Control" unique_id=1451242520]
 layout_mode = 3
