@@ -19,7 +19,7 @@ uniform vec4 glow_color : source_color = vec4(0.0, 1.0, 0.0, 0.7);
 uniform float glow_size = 28.0;
 
 // 内圈圆角半径，要和卡片的圆角一致（px）
-uniform float corner_radius = 40.0;
+uniform float corner_radius = 30.0;
 
 // 本节点的像素尺寸（脚本每帧写入）
 uniform vec2 rect_size = vec2(560.0, 720.0);

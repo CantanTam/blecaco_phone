@@ -1,32 +1,23 @@
 [gd_scene format=3 uid="uid://qrfd0mqte51"]
 
 [ext_resource type="Script" uid="uid://bn6qx2tphjk5q" path="res://scripts/addon_set.gd" id="1_xx2wr"]
-[ext_resource type="Script" path="res://scripts/touch_scroll.gd" id="2_touchscroll"]
+[ext_resource type="Script" uid="uid://b4ovukx0n2quc" path="res://scripts/touch_scroll.gd" id="2_touchscroll"]
 
-[sub_resource type="SystemFont" id="SystemFont_1n66d"]
-font_names = PackedStringArray("Sans-Serif")
-
-[sub_resource type="SystemFont" id="SystemFont_ytxg7"]
-
-; SpeedInput（MoveSpeedRow/SpeedInput，类型是 SpinBox）的文字框圆角。
-; SpinBox 内部是一个 LineEdit，它的外观来自 LineEdit 的 stylebox，
-; 所以这里覆盖 LineEdit/styles/* —— 数值照抄 Godot 默认主题，
-; 只把 corner_radius 从 3 改成 30。
-; ⚠️ 想改圆角大小，改下面三个 StyleBoxFlat 里的
-;    corner_radius_top_left / top_right / bottom_right / bottom_left 四个值即可。
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_speed_normal"]
-content_margin_left = 4.0
-content_margin_top = 4.0
-content_margin_right = 4.0
-content_margin_bottom = 4.0
-bg_color = Color(0.1, 0.1, 0.1, 0.6)
-border_width_bottom = 2
-border_color = Color(0, 0, 0, 0.6)
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_itembg"]
+content_margin_left = 10.0
+content_margin_top = 10.0
+content_margin_right = 10.0
+content_margin_bottom = 10.0
+bg_color = Color(1, 1, 1, 0.5)
 corner_radius_top_left = 30
 corner_radius_top_right = 30
 corner_radius_bottom_right = 30
 corner_radius_bottom_left = 30
 corner_detail = 20
+
+[sub_resource type="SystemFont" id="SystemFont_1n66d"]
+font_names = PackedStringArray("Sans-Serif")
+subpixel_positioning = 0
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_speed_focus"]
 content_margin_left = 4.0
@@ -38,7 +29,20 @@ border_width_left = 2
 border_width_top = 2
 border_width_right = 2
 border_width_bottom = 2
-border_color = Color(0.8, 0.8, 0.8, 1)
+corner_radius_top_left = 30
+corner_radius_top_right = 30
+corner_radius_bottom_right = 30
+corner_radius_bottom_left = 30
+corner_detail = 20
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_speed_normal"]
+content_margin_left = 4.0
+content_margin_top = 4.0
+content_margin_right = 4.0
+content_margin_bottom = 4.0
+bg_color = Color(0.1, 0.1, 0.1, 0.6)
+border_width_bottom = 2
+border_color = Color(0, 0, 0, 0.6)
 corner_radius_top_left = 30
 corner_radius_top_right = 30
 corner_radius_bottom_right = 30
@@ -59,33 +63,24 @@ corner_radius_bottom_right = 30
 corner_radius_bottom_left = 30
 corner_detail = 20
 
+[sub_resource type="SystemFont" id="SystemFont_ytxg7"]
+subpixel_positioning = 0
+
 [sub_resource type="Theme" id="Theme_xx2wr"]
 default_font = SubResource("SystemFont_ytxg7")
 default_font_size = 50
-LineEdit/styles/normal = SubResource("StyleBoxFlat_speed_normal")
 LineEdit/styles/focus = SubResource("StyleBoxFlat_speed_focus")
+LineEdit/styles/normal = SubResource("StyleBoxFlat_speed_normal")
 LineEdit/styles/read_only = SubResource("StyleBoxFlat_speed_read_only")
 
-; 每行的背景 ItemBg。数值只是「脚本没跑之前的默认外观」——
-; 真正的样式由 scripts/addon_set.gd 顶部的统一样式变量在 _ready() 里写进来。
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_itembg"]
-content_margin_left = 10.0
-content_margin_top = 10.0
-content_margin_right = 10.0
-content_margin_bottom = 10.0
-bg_color = Color(1, 1, 1, 0.5)
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_valuebox"]
+bg_color = Color(0.1, 0.1, 0.1, 0.6)
 corner_radius_top_left = 30
 corner_radius_top_right = 30
 corner_radius_bottom_right = 30
 corner_radius_bottom_left = 30
 corner_detail = 20
 
-; 滑条样式。默认值同样是「脚本没跑之前的兜底」，
-; 真正的值由 scripts/addon_set.gd 的统一样式变量写入。
-; ⚠️ 滑条本身**不设圆角**：圆角是外层 ValueBox（clip_children）裁出来的。
-; ⚠️ slider 的 content_margin_top/bottom 决定高度：
-;    一个 StyleBoxFlat 的最小高度 = content_margin_top + content_margin_bottom，
-;    所以 80 + 80 让它正好撑满数值框（行高 180 - 上下各 10 的 ValuePadding = 160）。
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_slider"]
 content_margin_top = 80.0
 content_margin_bottom = 80.0
@@ -96,17 +91,9 @@ content_margin_top = 80.0
 content_margin_bottom = 80.0
 bg_color = Color(0, 1, 0, 1)
 
-; 滑条行的数值框：既是底色，也是裁切里面滑条的遮罩（节点上 clip_children = 2）
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_valuebox"]
-bg_color = Color(0.1, 0.1, 0.1, 0.6)
-corner_radius_top_left = 30
-corner_radius_top_right = 30
-corner_radius_bottom_right = 30
-corner_radius_bottom_left = 30
-corner_detail = 20
-
 [node name="AddonSet" type="Control" unique_id=1767232535]
 layout_mode = 3
+anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_top = 50.0
@@ -132,12 +119,12 @@ size_flags_horizontal = 3
 custom_minimum_size = Vector2(0, 180)
 layout_mode = 2
 
-[node name="ItemBg" type="PanelContainer" parent="SetScrollPage/SettingsList/MoveSpeedRow"]
+[node name="ItemBg" type="PanelContainer" parent="SetScrollPage/SettingsList/MoveSpeedRow" unique_id=404964888]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_styles/panel = SubResource("StyleBoxFlat_itembg")
 
-[node name="RowContent" type="HBoxContainer" parent="SetScrollPage/SettingsList/MoveSpeedRow/ItemBg"]
+[node name="RowContent" type="HBoxContainer" parent="SetScrollPage/SettingsList/MoveSpeedRow/ItemBg" unique_id=26971465]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 25
@@ -170,21 +157,21 @@ min_value = 0.01
 value = 1.01
 alignment = 1
 
-[node name="StreamFpsRow" type="HBoxContainer" parent="SetScrollPage/SettingsList"]
+[node name="StreamFpsRow" type="HBoxContainer" parent="SetScrollPage/SettingsList" unique_id=1721202713]
 custom_minimum_size = Vector2(0, 180)
 layout_mode = 2
 
-[node name="ItemBg" type="PanelContainer" parent="SetScrollPage/SettingsList/StreamFpsRow"]
+[node name="ItemBg" type="PanelContainer" parent="SetScrollPage/SettingsList/StreamFpsRow" unique_id=996215522]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_styles/panel = SubResource("StyleBoxFlat_itembg")
 
-[node name="RowContent" type="HBoxContainer" parent="SetScrollPage/SettingsList/StreamFpsRow/ItemBg"]
+[node name="RowContent" type="HBoxContainer" parent="SetScrollPage/SettingsList/StreamFpsRow/ItemBg" unique_id=1560675942]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 25
 
-[node name="StreamFpsLabel" type="Label" parent="SetScrollPage/SettingsList/StreamFpsRow/ItemBg/RowContent"]
+[node name="StreamFpsLabel" type="Label" parent="SetScrollPage/SettingsList/StreamFpsRow/ItemBg/RowContent" unique_id=1191455709]
 custom_minimum_size = Vector2(220, 80)
 layout_mode = 2
 theme_override_fonts/font = SubResource("SystemFont_1n66d")
@@ -193,13 +180,13 @@ text = "推流帧率"
 horizontal_alignment = 2
 vertical_alignment = 1
 
-[node name="ValueBox" type="Panel" parent="SetScrollPage/SettingsList/StreamFpsRow/ItemBg/RowContent"]
+[node name="ValueBox" type="Panel" parent="SetScrollPage/SettingsList/StreamFpsRow/ItemBg/RowContent" unique_id=1597600437]
 clip_children = 2
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_styles/panel = SubResource("StyleBoxFlat_valuebox")
 
-[node name="StreamFpsSlider" type="HSlider" parent="SetScrollPage/SettingsList/StreamFpsRow/ItemBg/RowContent/ValueBox"]
+[node name="StreamFpsSlider" type="HSlider" parent="SetScrollPage/SettingsList/StreamFpsRow/ItemBg/RowContent/ValueBox" unique_id=1322185662]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -211,38 +198,36 @@ theme_override_styles/grabber_area = SubResource("StyleBoxFlat_slider_fill")
 theme_override_styles/grabber_area_highlight = SubResource("StyleBoxFlat_slider_fill")
 min_value = 1.0
 max_value = 30.0
-step = 1.0
 value = 10.0
 
-[node name="ValueText" type="Label" parent="SetScrollPage/SettingsList/StreamFpsRow/ItemBg/RowContent/ValueBox/StreamFpsSlider"]
+[node name="ValueText" type="Label" parent="SetScrollPage/SettingsList/StreamFpsRow/ItemBg/RowContent/ValueBox/StreamFpsSlider" unique_id=714415775]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-mouse_filter = 2
 theme_override_fonts/font = SubResource("SystemFont_1n66d")
 theme_override_font_sizes/font_size = 50
 text = "10"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="StreamQualityRow" type="HBoxContainer" parent="SetScrollPage/SettingsList"]
+[node name="StreamQualityRow" type="HBoxContainer" parent="SetScrollPage/SettingsList" unique_id=1984399220]
 custom_minimum_size = Vector2(0, 180)
 layout_mode = 2
 
-[node name="ItemBg" type="PanelContainer" parent="SetScrollPage/SettingsList/StreamQualityRow"]
+[node name="ItemBg" type="PanelContainer" parent="SetScrollPage/SettingsList/StreamQualityRow" unique_id=1942347667]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_styles/panel = SubResource("StyleBoxFlat_itembg")
 
-[node name="RowContent" type="HBoxContainer" parent="SetScrollPage/SettingsList/StreamQualityRow/ItemBg"]
+[node name="RowContent" type="HBoxContainer" parent="SetScrollPage/SettingsList/StreamQualityRow/ItemBg" unique_id=866624158]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 25
 
-[node name="StreamQualityLabel" type="Label" parent="SetScrollPage/SettingsList/StreamQualityRow/ItemBg/RowContent"]
+[node name="StreamQualityLabel" type="Label" parent="SetScrollPage/SettingsList/StreamQualityRow/ItemBg/RowContent" unique_id=946864844]
 custom_minimum_size = Vector2(220, 80)
 layout_mode = 2
 theme_override_fonts/font = SubResource("SystemFont_1n66d")
@@ -251,13 +236,13 @@ text = "推流画质"
 horizontal_alignment = 2
 vertical_alignment = 1
 
-[node name="ValueBox" type="Panel" parent="SetScrollPage/SettingsList/StreamQualityRow/ItemBg/RowContent"]
+[node name="ValueBox" type="Panel" parent="SetScrollPage/SettingsList/StreamQualityRow/ItemBg/RowContent" unique_id=227511643]
 clip_children = 2
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_styles/panel = SubResource("StyleBoxFlat_valuebox")
 
-[node name="StreamQualitySlider" type="HSlider" parent="SetScrollPage/SettingsList/StreamQualityRow/ItemBg/RowContent/ValueBox"]
+[node name="StreamQualitySlider" type="HSlider" parent="SetScrollPage/SettingsList/StreamQualityRow/ItemBg/RowContent/ValueBox" unique_id=930827444]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -268,39 +253,36 @@ theme_override_styles/slider = SubResource("StyleBoxFlat_slider")
 theme_override_styles/grabber_area = SubResource("StyleBoxFlat_slider_fill")
 theme_override_styles/grabber_area_highlight = SubResource("StyleBoxFlat_slider_fill")
 min_value = 10.0
-max_value = 100.0
-step = 1.0
 value = 70.0
 
-[node name="ValueText" type="Label" parent="SetScrollPage/SettingsList/StreamQualityRow/ItemBg/RowContent/ValueBox/StreamQualitySlider"]
+[node name="ValueText" type="Label" parent="SetScrollPage/SettingsList/StreamQualityRow/ItemBg/RowContent/ValueBox/StreamQualitySlider" unique_id=879206979]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-mouse_filter = 2
 theme_override_fonts/font = SubResource("SystemFont_1n66d")
 theme_override_font_sizes/font_size = 50
 text = "70"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="StreamSmoothRow" type="HBoxContainer" parent="SetScrollPage/SettingsList"]
+[node name="StreamSmoothRow" type="HBoxContainer" parent="SetScrollPage/SettingsList" unique_id=1853911413]
 custom_minimum_size = Vector2(0, 180)
 layout_mode = 2
 
-[node name="ItemBg" type="PanelContainer" parent="SetScrollPage/SettingsList/StreamSmoothRow"]
+[node name="ItemBg" type="PanelContainer" parent="SetScrollPage/SettingsList/StreamSmoothRow" unique_id=1809293561]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_styles/panel = SubResource("StyleBoxFlat_itembg")
 
-[node name="RowContent" type="HBoxContainer" parent="SetScrollPage/SettingsList/StreamSmoothRow/ItemBg"]
+[node name="RowContent" type="HBoxContainer" parent="SetScrollPage/SettingsList/StreamSmoothRow/ItemBg" unique_id=1657863502]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 25
 
-[node name="StreamSmoothLabel" type="Label" parent="SetScrollPage/SettingsList/StreamSmoothRow/ItemBg/RowContent"]
+[node name="StreamSmoothLabel" type="Label" parent="SetScrollPage/SettingsList/StreamSmoothRow/ItemBg/RowContent" unique_id=922566913]
 custom_minimum_size = Vector2(220, 80)
 layout_mode = 2
 theme_override_fonts/font = SubResource("SystemFont_1n66d")
@@ -309,13 +291,13 @@ text = "平滑程度"
 horizontal_alignment = 2
 vertical_alignment = 1
 
-[node name="ValueBox" type="Panel" parent="SetScrollPage/SettingsList/StreamSmoothRow/ItemBg/RowContent"]
+[node name="ValueBox" type="Panel" parent="SetScrollPage/SettingsList/StreamSmoothRow/ItemBg/RowContent" unique_id=1595823557]
 clip_children = 2
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_styles/panel = SubResource("StyleBoxFlat_valuebox")
 
-[node name="StreamSmoothSlider" type="HSlider" parent="SetScrollPage/SettingsList/StreamSmoothRow/ItemBg/RowContent/ValueBox"]
+[node name="StreamSmoothSlider" type="HSlider" parent="SetScrollPage/SettingsList/StreamSmoothRow/ItemBg/RowContent/ValueBox" unique_id=1587123017]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -328,14 +310,13 @@ theme_override_styles/grabber_area_highlight = SubResource("StyleBoxFlat_slider_
 max_value = 1.0
 step = 0.01
 
-[node name="ValueText" type="Label" parent="SetScrollPage/SettingsList/StreamSmoothRow/ItemBg/RowContent/ValueBox/StreamSmoothSlider"]
+[node name="ValueText" type="Label" parent="SetScrollPage/SettingsList/StreamSmoothRow/ItemBg/RowContent/ValueBox/StreamSmoothSlider" unique_id=957539992]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-mouse_filter = 2
 theme_override_fonts/font = SubResource("SystemFont_1n66d")
 theme_override_font_sizes/font_size = 50
 text = "0.00"

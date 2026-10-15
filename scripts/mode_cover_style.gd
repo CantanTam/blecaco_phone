@@ -14,7 +14,7 @@ class_name ModeCoverStyle
 
 ## 四个圆角半径（px）
 ## ⚠️ 卡片的样式盒和光晕 shader 共用这个值，改这里两边一起变。
-const CORNER_RADIUS := 40
+const CORNER_RADIUS := 30
 
 ## 卡片底色。白色 —— 和封面图自己的白底一致；必须不透明。
 const COVER_BG := Color(1.0, 1.0, 1.0, 1.0)
@@ -24,7 +24,7 @@ const COVER_BG := Color(1.0, 1.0, 1.0, 1.0)
 # ------------------------------------------------------------------
 
 ## 光晕向外扩散的厚度（px）。调大 = 范围更大。
-const GLOW_SIZE := 38.0
+const GLOW_SIZE := 48.0
 
 ## 光晕颜色 + 强度。alpha 就是强度，比如 0.4 = 更淡、1.0 = 最亮。
 const GLOW_COLOR := Color(0.0, 1.0, 0.0, 0.8)
