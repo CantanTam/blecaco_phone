@@ -20,15 +20,15 @@ const ANIMATION_DURATION := 0.21
 const CENTER_POP_DURATION := 0.125
 
 @onready var cover_flow: Control = $CoverFlow
+@onready var cover_glow: ColorRect = $CoverFlow/CoverGlow
 
 var selected_cover_name: String = "FreeCover"
 var current_mode_scene_path: String = ""
 var cover_animation_running: bool = false
 
-## 卡片的两份样式盒：带光晕 / 不带光晕。
-## 外观参数在 scripts/mode_cover_style.gd，这里只负责按选中状态挑一份。
-var _cover_style_glow: StyleBoxFlat
-var _cover_style_plain: StyleBoxFlat
+## 卡片样式盒（圆角白卡，所有卡片共用）。
+## 外观参数在 scripts/mode_cover_style.gd；光晕不在这里，见 _update_cover_glow。
+var _cover_style: StyleBoxFlat
 
 func _ready() -> void:
 	# 未由外部指定时，从 Options 取当前模式
@@ -45,11 +45,13 @@ func _ready() -> void:
 			selected_cover_name = cover_name
 			break
 
-	# 卡片外观（四个圆角 + 选中那圈光晕）统一由 ModeCoverStyle 提供
-	_cover_style_glow = ModeCoverStyle.make(true)
-	_cover_style_plain = ModeCoverStyle.make(false)
+	# 卡片外观（四个圆角）统一由 ModeCoverStyle 提供，所有卡片共用一份；
+	# 光晕是单独一个节点，由 _update_cover_glow() 每帧跟着选中那张走
+	_cover_style = ModeCoverStyle.make_cover()
+	ModeCoverStyle.apply_glow(cover_glow.material as ShaderMaterial)
 
 	_layout_covers()
+	_apply_cover_styles()
 
 	for cover_name in Options.MODE_SCENES:
 		var cover: Control = cover_flow.get_node_or_null(
@@ -115,35 +117,56 @@ func _layout_covers() -> void:
 		cover.z_index = target["z_index"]
 		cover.modulate = _get_cover_modulate(distance, 1.0, true)
 
-	_refresh_cover_glow()
 
-
-## 只有「选中 / 中间高亮放大」的那张卡片带光晕，其余卡片没有。
-##
-## ⚠️ 布局一变就要调一次，否则换封面之后光晕会留在旧的那张上。
-##    光晕本身就是卡片样式盒的阴影，所以它会自动沿着那张卡的圆角规形走，
-##    并跟着它的放大 / 移动一起动。
-func _refresh_cover_glow() -> void:
-	var selected_index: int = COVER_ORDER.find(selected_cover_name)
-
-	if selected_index == -1:
+## 所有卡片套同一份圆角卡片样式。
+## 光晕不在这里 —— 它是 CoverGlow 那个独立节点，见 _update_cover_glow()。
+func _apply_cover_styles() -> void:
+	if _cover_style == null:
 		return
 
-	if _cover_style_glow == null or _cover_style_plain == null:
-		return
-
-	for i in range(COVER_ORDER.size()):
+	for cover_name in COVER_ORDER:
 		var cover: Control = cover_flow.get_node_or_null(
-			COVER_ORDER[i]
+			cover_name
 		) as Control
 
-		if cover == null:
-			continue
+		if cover != null:
+			cover.add_theme_stylebox_override("panel", _cover_style)
 
-		cover.add_theme_stylebox_override(
-			"panel",
-			_cover_style_glow if i == selected_index else _cover_style_plain
-		)
+
+func _process(_delta: float) -> void:
+	_update_cover_glow()
+
+
+## 把光晕节点对齐到「当前选中那张卡片」，并比它大一圈（GLOW_SIZE）。
+##
+## ⚠️ 每帧都做：切换选中时卡片是 tween 放大 / 移动的，光晕必须跟着一起走。
+##    只有选中那张有光晕 —— 找不到选中卡片时整个隐藏。
+func _update_cover_glow() -> void:
+	if cover_glow == null:
+		return
+
+	var cover: Control = cover_flow.get_node_or_null(
+		selected_cover_name
+	) as Control
+
+	if cover == null:
+		cover_glow.visible = false
+		return
+
+	var margin := Vector2(
+		ModeCoverStyle.GLOW_SIZE,
+		ModeCoverStyle.GLOW_SIZE
+	)
+
+	cover_glow.visible = true
+	cover_glow.position = cover.position - margin
+	cover_glow.size = cover.size + margin * 2.0
+	cover_glow.z_index = cover.z_index
+
+	var material := cover_glow.material as ShaderMaterial
+
+	if material != null:
+		material.set_shader_parameter("rect_size", cover_glow.size)
 
 
 func _get_cover_distance(
@@ -520,9 +543,6 @@ func _animate_one_step(direction: int) -> void:
 
 	selected_cover_name = COVER_ORDER[new_index]
 
-	# 光晕交接给新选中的那张
-	_refresh_cover_glow()
-
 
 func _animate_center_cover() -> void:
 	var selected_index: int = COVER_ORDER.find(
@@ -583,5 +603,3 @@ func _animate_center_cover() -> void:
 		).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 
 	await tween.finished
-
-	_refresh_cover_glow()

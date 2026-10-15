@@ -7,6 +7,7 @@
 [ext_resource type="Texture2D" uid="uid://g7uj3dp1r77p" path="res://resources/GameMode.svg" id="4_sx8c6"]
 [ext_resource type="Texture2D" uid="uid://cf5xe046fh0ej" path="res://resources/CameraMode.svg" id="5_dxjqd"]
 [ext_resource type="Texture2D" uid="uid://rhxgb6wsi6ah" path="res://resources/DroneMode.svg" id="6_xuogk"]
+[ext_resource type="Shader" path="res://resources/cover_glow.gdshader" id="7_coverglow"]
 
 ; 卡片外观（脚本没跑之前的兜底 / 编辑器预览用）：四个圆角的白卡。
 ;
@@ -24,6 +25,10 @@ corner_radius_bottom_right = 40
 corner_radius_bottom_left = 40
 corner_detail = 20
 
+; 光晕节点的材质（shader 参数由 mode_cover_style.gd 写入）
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_coverglow"]
+shader = ExtResource("7_coverglow")
+
 [node name="ModeSelect" type="Control" unique_id=1451242520]
 layout_mode = 3
 anchors_preset = 15
@@ -40,6 +45,16 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+
+; 光晕：由 mode_select.gd 每帧对齐到「当前选中那张卡片」并改大小。
+; 位置/尺寸是脚本算的，这里不用管；mouse_filter=2 保证不挡触摸。
+[node name="CoverGlow" type="ColorRect" parent="CoverFlow"]
+z_index = 3
+material = SubResource("ShaderMaterial_coverglow")
+offset_right = 560.0
+offset_bottom = 720.0
+mouse_filter = 2
+color = Color(1, 1, 1, 1)
 
 [node name="FreeCover" type="Panel" parent="CoverFlow" unique_id=755658535]
 z_index = 3
