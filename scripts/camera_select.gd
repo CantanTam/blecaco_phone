@@ -22,7 +22,11 @@ const ICON_INACTIVE := preload("res://resources/InactiveCamera.svg")
 ## Options 里存摄像机状态的键（由 main.gd 写入）
 const CAMERAS_KEY := "blender/cameras"
 
-## 发给 Blender 的 setting 名
+## 发给 Blender 的 setting 名：摄像机列表。
+## 发一个 null 值过去 = 「把当前列表给我一份」（Blender 会立刻回推）。
+const CAMERAS_SETTING := "cameras"
+
+## 发给 Blender 的 setting 名：切换活动摄像机
 const ACTIVE_CAMERA_SETTING := "active_camera"
 
 ## 模板行的节点名（场景里放着，用来复制出每一台摄像机）
@@ -53,6 +57,21 @@ func _ready() -> void:
 	Options.changed.connect(_on_options_changed)
 
 	_rebuild()
+
+	# 打开页面时主动向 Blender 要一次当前列表。
+	#
+	# ⚠️ 光靠 Blender 那边「新客户端接入 / 状态变化时推」是不够的：
+	#    手机早就在连线了（那个时机已经过去），这里要一次最稳。
+	_request_camera_list()
+
+
+## 主动请求一次摄像机列表（Blender 收到就回推 setting/cameras）。
+func _request_camera_list() -> void:
+	if connection == null:
+		# 还没连上：不报错，等 Blender 自己推
+		return
+
+	connection.call("send_setting", CAMERAS_SETTING, null)
 
 
 # ============================================================
@@ -86,8 +105,8 @@ func _rebuild() -> void:
 
 	var names: Array = state.get("names", [])
 
+	# ⚠️ 一台摄像机都没有时**什么都不显示** —— 按需求不需要任何提示。
 	if names.is_empty():
-		_add_empty_hint()
 		return
 
 	var active := str(state.get("active", ""))
@@ -142,15 +161,6 @@ func _add_row(template: Control, camera_name: String, is_active: bool) -> void:
 	if item_bg != null:
 		item_bg.mouse_filter = Control.MOUSE_FILTER_STOP
 		item_bg.gui_input.connect(_on_row_gui_input.bind(camera_name))
-
-
-## 一台摄像机都没有时给个提示（不然页面看起来是坏的）。
-func _add_empty_hint() -> void:
-	var hint := Label.new()
-	hint.text = "（没有摄像机）"
-	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hint.add_theme_font_size_override("font_size", SettingsStyle.FONT_SIZE)
-	camera_list.add_child(hint)
 
 
 # ============================================================
