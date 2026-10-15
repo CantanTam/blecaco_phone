@@ -79,6 +79,31 @@ corner_radius_bottom_right = 30
 corner_radius_bottom_left = 30
 corner_detail = 20
 
+; 滑条样式。默认值同样是「脚本没跑之前的兜底」，
+; 真正的值由 scripts/addon_set.gd 的统一样式变量写入。
+; ⚠️ slider 的 content_margin_top/bottom 决定轨道厚度：
+;    一个 StyleBoxFlat 的最小高度 = content_margin_top + content_margin_bottom，
+;    所以 80 + 80 让轨道正好撑满数值框（行高 180 - 上下各 10 的 ValuePadding = 160）。
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_slider"]
+content_margin_top = 80.0
+content_margin_bottom = 80.0
+bg_color = Color(0.1, 0.1, 0.1, 0.6)
+corner_radius_top_left = 30
+corner_radius_top_right = 30
+corner_radius_bottom_right = 30
+corner_radius_bottom_left = 30
+corner_detail = 20
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_slider_fill"]
+content_margin_top = 80.0
+content_margin_bottom = 80.0
+bg_color = Color(1, 1, 1, 0.18)
+corner_radius_top_left = 30
+corner_radius_top_right = 30
+corner_radius_bottom_right = 30
+corner_radius_bottom_left = 30
+corner_detail = 20
+
 [node name="AddonSet" type="Control" unique_id=1767232535]
 layout_mode = 3
 anchor_right = 1.0
@@ -142,3 +167,145 @@ theme_override_constants/set_min_buttons_width_from_icons = 0
 min_value = 0.01
 value = 1.01
 alignment = 1
+
+[node name="StreamFpsRow" type="HBoxContainer" parent="SetScrollPage/SettingsList"]
+custom_minimum_size = Vector2(0, 180)
+layout_mode = 2
+
+[node name="ItemBg" type="PanelContainer" parent="SetScrollPage/SettingsList/StreamFpsRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBoxFlat_itembg")
+
+[node name="RowContent" type="HBoxContainer" parent="SetScrollPage/SettingsList/StreamFpsRow/ItemBg"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 25
+
+[node name="StreamFpsLabel" type="Label" parent="SetScrollPage/SettingsList/StreamFpsRow/ItemBg/RowContent"]
+custom_minimum_size = Vector2(220, 80)
+layout_mode = 2
+theme_override_fonts/font = SubResource("SystemFont_1n66d")
+theme_override_font_sizes/font_size = 50
+text = "推流帧率"
+horizontal_alignment = 2
+vertical_alignment = 1
+
+[node name="StreamFpsSlider" type="HSlider" parent="SetScrollPage/SettingsList/StreamFpsRow/ItemBg/RowContent"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/slider = SubResource("StyleBoxFlat_slider")
+theme_override_styles/grabber_area = SubResource("StyleBoxFlat_slider_fill")
+theme_override_styles/grabber_area_highlight = SubResource("StyleBoxFlat_slider_fill")
+min_value = 1.0
+max_value = 30.0
+step = 1.0
+value = 10.0
+
+[node name="ValueText" type="Label" parent="SetScrollPage/SettingsList/StreamFpsRow/ItemBg/RowContent/StreamFpsSlider"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_fonts/font = SubResource("SystemFont_1n66d")
+theme_override_font_sizes/font_size = 50
+text = "10"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="StreamQualityRow" type="HBoxContainer" parent="SetScrollPage/SettingsList"]
+custom_minimum_size = Vector2(0, 180)
+layout_mode = 2
+
+[node name="ItemBg" type="PanelContainer" parent="SetScrollPage/SettingsList/StreamQualityRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBoxFlat_itembg")
+
+[node name="RowContent" type="HBoxContainer" parent="SetScrollPage/SettingsList/StreamQualityRow/ItemBg"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 25
+
+[node name="StreamQualityLabel" type="Label" parent="SetScrollPage/SettingsList/StreamQualityRow/ItemBg/RowContent"]
+custom_minimum_size = Vector2(220, 80)
+layout_mode = 2
+theme_override_fonts/font = SubResource("SystemFont_1n66d")
+theme_override_font_sizes/font_size = 50
+text = "推流画质"
+horizontal_alignment = 2
+vertical_alignment = 1
+
+[node name="StreamQualitySlider" type="HSlider" parent="SetScrollPage/SettingsList/StreamQualityRow/ItemBg/RowContent"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/slider = SubResource("StyleBoxFlat_slider")
+theme_override_styles/grabber_area = SubResource("StyleBoxFlat_slider_fill")
+theme_override_styles/grabber_area_highlight = SubResource("StyleBoxFlat_slider_fill")
+min_value = 10.0
+max_value = 100.0
+step = 1.0
+value = 70.0
+
+[node name="ValueText" type="Label" parent="SetScrollPage/SettingsList/StreamQualityRow/ItemBg/RowContent/StreamQualitySlider"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_fonts/font = SubResource("SystemFont_1n66d")
+theme_override_font_sizes/font_size = 50
+text = "70"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="StreamSmoothRow" type="HBoxContainer" parent="SetScrollPage/SettingsList"]
+custom_minimum_size = Vector2(0, 180)
+layout_mode = 2
+
+[node name="ItemBg" type="PanelContainer" parent="SetScrollPage/SettingsList/StreamSmoothRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBoxFlat_itembg")
+
+[node name="RowContent" type="HBoxContainer" parent="SetScrollPage/SettingsList/StreamSmoothRow/ItemBg"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 25
+
+[node name="StreamSmoothLabel" type="Label" parent="SetScrollPage/SettingsList/StreamSmoothRow/ItemBg/RowContent"]
+custom_minimum_size = Vector2(220, 80)
+layout_mode = 2
+theme_override_fonts/font = SubResource("SystemFont_1n66d")
+theme_override_font_sizes/font_size = 50
+text = "平滑程度"
+horizontal_alignment = 2
+vertical_alignment = 1
+
+[node name="StreamSmoothSlider" type="HSlider" parent="SetScrollPage/SettingsList/StreamSmoothRow/ItemBg/RowContent"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/slider = SubResource("StyleBoxFlat_slider")
+theme_override_styles/grabber_area = SubResource("StyleBoxFlat_slider_fill")
+theme_override_styles/grabber_area_highlight = SubResource("StyleBoxFlat_slider_fill")
+max_value = 1.0
+step = 0.01
+
+[node name="ValueText" type="Label" parent="SetScrollPage/SettingsList/StreamSmoothRow/ItemBg/RowContent/StreamSmoothSlider"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_fonts/font = SubResource("SystemFont_1n66d")
+theme_override_font_sizes/font_size = 50
+text = "0.00"
+horizontal_alignment = 1
+vertical_alignment = 1

@@ -75,7 +75,20 @@ const DEFAULTS := {
 	# ------------------------------------------------------------
 	"blur_mask/opacity": 0.7,   # 半透明程度 0.0~1.0（0=完全透出画面，1=完全被遮罩色盖住）
 	"blur_mask/radius": 50,    # 模糊半径，单位「屏幕像素」（0=不糊，越大越糊）
-	"blur_mask/ring_taps": 2     # 模糊采样圈数 1~4（越大越平滑也越费，手机建议 2）
+	"blur_mask/ring_taps": 2,    # 模糊采样圈数 1~4（越大越平滑也越费，手机建议 2）
+	# ------------------------------------------------------------
+	# 推流参数（addon_set.tscn 里三根滑条写入）
+	#
+	# 与 Blender 插件 blecaco/addon_property.py 里的属性一一同名：
+	#     fps     → props.fps      推流帧率   1 ~ 30
+	#     quality → props.quality  推流画质   10 ~ 100
+	#     smooth  → props.smooth   平滑程度   0.0 ~ 1.0
+	# 拖动滑条时同时做两件事：存进这里 + 用 setting 消息发给 Blender。
+	# ⚠️ 这边的范围要和 addon_property.py 里声明的保持一致。
+	# ------------------------------------------------------------
+	"blender/fps": 10.0,
+	"blender/quality": 70.0,
+	"blender/smooth": 0.0
 }
 
 # 运行期的实际取值（_load 时以 DEFAULTS 为底，再用存档覆盖）
@@ -195,15 +208,18 @@ func _load() -> void:
 	for a_key in DEFAULTS.keys():
 		var parts: PackedStringArray = str(a_key).split("/", true, 1)
 
-		if parts.size() != 2:
-			push_warning("[Options] 非法 key（应为 section/name）：" + a_key)
-			continue
-
-		_values[a_key] = config.get_value(
-			parts[0],
-			parts[1],
-			DEFAULTS[a_key]
-		)
+		if parts.size() == 2:
+			_values[a_key] = config.get_value(
+				parts[0],
+				parts[1],
+				DEFAULTS[a_key]
+			)
+		else:
+			_values[a_key] = config.get_value(
+				"general",
+				str(a_key),
+				DEFAULTS[a_key]
+			)
 
 
 func save() -> void:
@@ -212,10 +228,10 @@ func save() -> void:
 	for a_key in _values.keys():
 		var parts: PackedStringArray = str(a_key).split("/", true, 1)
 
-		if parts.size() != 2:
-			continue
-
-		config.set_value(parts[0], parts[1], _values[a_key])
+		if parts.size() == 2:
+			config.set_value(parts[0], parts[1], _values[a_key])
+		else:
+			config.set_value("general", str(a_key), _values[a_key])
 
 	var error := config.save(CONFIG_FILE)
 
