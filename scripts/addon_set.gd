@@ -1,7 +1,7 @@
 extends Control
 
 # ============================================================
-# 设置页：移动倍数（SpinBox）+ 三根推流参数滑条
+# 设置页：移动倍数（SpinBox）+ 四根推流参数滑条
 #
 # ⚠️ 所有外观（ItemBg / 数值框 / 字号 / 圆角 / 间距 / 滑条颜色）
 #    统一在 scripts/settings_style.gd 里 —— **改外观请改那里**。
@@ -14,6 +14,7 @@ extends Control
 # 每条描述一行：Options 用的键、发给 Blender 的 setting 名、取值范围。
 # key 与 setting 一一对应，setting 就是 blecaco/addon_property.py 里的属性名：
 #     fps     → props.fps      推流帧率
+#     width   → props.width    推流宽度（高度按相机画幅自动算）
 #     quality → props.quality  推流画质
 #     smooth  → props.smooth   平滑程度
 #
@@ -28,6 +29,18 @@ const SLIDER_ROWS := [
 		"min": 1.0,
 		"max": 30.0,
 		"step": 1.0,
+		"decimals": 0,
+	},
+	{
+		# 推流宽度：高度由 Blender 按相机画幅自动算，宽高都会取偶数。
+		# 步进 10 是为了在手机上更好拖；上限 1920 是手机滑条的范围
+		# （Blender 属性本身允许到 3840）。
+		"row": "StreamWidthRow",
+		"key": "blender/width",
+		"setting": "width",
+		"min": 160.0,
+		"max": 1920.0,
+		"step": 10.0,
 		"decimals": 0,
 	},
 	{

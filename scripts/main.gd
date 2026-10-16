@@ -7,13 +7,15 @@ extends Control
 #
 #   output_fps  场景输出帧率（决定手机发送频率 / 前进步长）
 #   fps         推流帧率 ┐
-#   quality     推流画质 ├ 手机连上时的「校准」用，见 addon_set.gd
+#   width       推流宽度 ├ 手机连上时的「校准」用，见 addon_set.gd
+#   quality     推流画质 │
 #   smooth      平滑程度 ┘
 #   cameras     摄像机列表 + 活动摄像机    见 camera_select.gd
 #   shading     3D 视图的着色方式 + X-Ray  见 shade_set_page.gd
 const BLENDER_SETTING_KEYS := {
 	"output_fps": "blender/output_fps",
 	"fps": "blender/fps",
+	"width": "blender/width",
 	"quality": "blender/quality",
 	"smooth": "blender/smooth",
 	"cameras": "blender/cameras",

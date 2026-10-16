@@ -85,16 +85,19 @@ const DEFAULTS := {
 	"blur_mask/radius": 50,    # 模糊半径，单位「屏幕像素」（0=不糊，越大越糊）
 	"blur_mask/ring_taps": 2,    # 模糊采样圈数 1~4（越大越平滑也越费，手机建议 2）
 	# ------------------------------------------------------------
-	# 推流参数（addon_set.tscn 里三根滑条写入）
+	# 推流参数（addon_set.tscn 里四根滑条写入）
 	#
 	# 与 Blender 插件 blecaco/addon_property.py 里的属性一一同名：
 	#     fps     → props.fps      推流帧率   1 ~ 30
+	#     width   → props.width    推流宽度   160 ~ 1920（手机滑条范围）
 	#     quality → props.quality  推流画质   10 ~ 100
 	#     smooth  → props.smooth   平滑程度   0.0 ~ 1.0
 	# 拖动滑条时同时做两件事：存进这里 + 用 setting 消息发给 Blender。
 	# ⚠️ 这边的范围要和 addon_property.py 里声明的保持一致。
 	# ------------------------------------------------------------
 	"blender/fps": 10.0,
+	# 默认值与 addon_property.py 里 props.width 的 default 保持一致
+	"blender/width": 640.0,
 	"blender/quality": 70.0,
 	# 默认值与 addon_property.py 里 props.smooth 的 default 保持一致
 	"blender/smooth": 0.5,

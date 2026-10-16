@@ -213,6 +213,63 @@ text = "10"
 horizontal_alignment = 1
 vertical_alignment = 1
 
+[node name="StreamWidthRow" type="HBoxContainer" parent="SetScrollPage/SettingsList" unique_id=1400000001]
+custom_minimum_size = Vector2(0, 180)
+layout_mode = 2
+
+[node name="ItemBg" type="PanelContainer" parent="SetScrollPage/SettingsList/StreamWidthRow" unique_id=1400000002]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBoxFlat_itembg")
+
+[node name="RowContent" type="HBoxContainer" parent="SetScrollPage/SettingsList/StreamWidthRow/ItemBg" unique_id=1400000003]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 25
+
+[node name="StreamWidthLabel" type="Label" parent="SetScrollPage/SettingsList/StreamWidthRow/ItemBg/RowContent" unique_id=1400000004]
+custom_minimum_size = Vector2(220, 80)
+layout_mode = 2
+theme_override_fonts/font = SubResource("SystemFont_1n66d")
+theme_override_font_sizes/font_size = 50
+text = "推流宽度"
+horizontal_alignment = 2
+vertical_alignment = 1
+
+[node name="ValueBox" type="Panel" parent="SetScrollPage/SettingsList/StreamWidthRow/ItemBg/RowContent" unique_id=1400000005]
+clip_children = 2
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBoxFlat_valuebox")
+
+[node name="StreamWidthSlider" type="HSlider" parent="SetScrollPage/SettingsList/StreamWidthRow/ItemBg/RowContent/ValueBox" unique_id=1400000006]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/slider = SubResource("StyleBoxFlat_slider")
+theme_override_styles/grabber_area = SubResource("StyleBoxFlat_slider_fill")
+theme_override_styles/grabber_area_highlight = SubResource("StyleBoxFlat_slider_fill")
+min_value = 160.0
+max_value = 1920.0
+step = 10.0
+value = 640.0
+
+[node name="ValueText" type="Label" parent="SetScrollPage/SettingsList/StreamWidthRow/ItemBg/RowContent/ValueBox/StreamWidthSlider" unique_id=1400000007]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_fonts/font = SubResource("SystemFont_1n66d")
+theme_override_font_sizes/font_size = 50
+text = "640"
+horizontal_alignment = 1
+vertical_alignment = 1
+
 [node name="StreamQualityRow" type="HBoxContainer" parent="SetScrollPage/SettingsList" unique_id=1984399220]
 custom_minimum_size = Vector2(0, 180)
 layout_mode = 2
