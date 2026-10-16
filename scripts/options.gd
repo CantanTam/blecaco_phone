@@ -54,6 +54,14 @@ const DEFAULTS := {
 	# （插件在客户端接入/帧率变化时推送 setting/output_fps，见 main.gd）。
 	# 放在这里只为让各模式有统一的读取入口，不进设置界面、不参与持久化。
 	"blender/output_fps": 60.0,
+	# 同上，也是 Blender 推来的运行时状态：3D 视图的着色方式 + X-Ray 开关
+	# （setting/shading，见 main.gd 与 scripts/shade_set_page.gd）。
+	#   shading —— Blender 的 space.shading.type，四个枚举名之一：
+	#              "WIREFRAME" / "SOLID" / "MATERIAL" / "RENDERED"
+	#   xray    —— X-Ray 开关
+	# ⚠️ 这里的默认值只是「还没收到 Blender 推送之前」的兜底
+	#    （SOLID 和 Blender 新场景的默认一致），连上之后一律以 Blender 为准。
+	"blender/shading": {"xray": false, "shading": "SOLID"},
 	# 姿态平滑强度 0.0 ~ 1.0（0 = 完全关闭，1 = 最强）。
 	# 由 getrotation.gd 的 One Euro Filter 使用，作用于所有模式。
 	# 注意它同时影响「手机看到的预览」与「录制出的动画」——

@@ -1,9 +1,170 @@
-[gd_scene format=3 uid="uid://b1k6tvuiq1owd"]
+[gd_scene load_steps=8 format=3 uid="uid://b1k6tvuiq1owd"]
 
-[node name="ShadeSetPage" type="Control" unique_id=1750159496]
+[ext_resource type="Script" path="res://scripts/shade_set_page.gd" id="1_shade"]
+
+; ================================================================
+; 底部那排圆形按钮的样式。
+;
+; ⚠️ 这四个和 main.tscn 里 ShadeSetButton 用的四个 StyleBoxFlat 是**同一套值**
+;    （normal / pressed / hover / hover_pressed），照着复制过来的：
+;        normal / hover          = 白色 47% 半透明
+;        pressed / hover_pressed = 纯白
+;        四个圆角半径 75（按钮 150px 见方 → 正好是圆），corner_detail 20
+;    要改外观就改这里（OptionButtons 那排的按钮同理）。
+; ================================================================
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_shade_normal"]
+bg_color = Color(1, 1, 1, 0.47058824)
+corner_radius_top_left = 75
+corner_radius_top_right = 75
+corner_radius_bottom_right = 75
+corner_radius_bottom_left = 75
+corner_detail = 20
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_shade_pressed"]
+bg_color = Color(1, 1, 1, 1)
+corner_radius_top_left = 75
+corner_radius_top_right = 75
+corner_radius_bottom_right = 75
+corner_radius_bottom_left = 75
+corner_detail = 20
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_shade_hover"]
+bg_color = Color(1, 1, 1, 0.47058824)
+corner_radius_top_left = 75
+corner_radius_top_right = 75
+corner_radius_bottom_right = 75
+corner_radius_bottom_left = 75
+corner_detail = 20
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_shade_hover_pressed"]
+bg_color = Color(1, 1, 1, 1)
+corner_radius_top_left = 75
+corner_radius_top_right = 75
+corner_radius_bottom_right = 75
+corner_radius_bottom_left = 75
+corner_detail = 20
+
+; 面板本身不画东西（和 main.tscn 的 OptionPanel 一样），
+; 只有按钮可见 —— 页面后面就是视频画面。
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_shade_panel"]
+bg_color = Color(0.6, 0.6, 0.6, 0)
+
+; 四个着色方式按钮互斥（着色方式必须有且只有一个）。
+; ⚠️ XRay 不在这个组里：它是独立的开关，可以同时开着。
+[sub_resource type="ButtonGroup" id="ButtonGroup_shading"]
+allow_unpress = false
+
+[node name="ShadeSetPage" type="Control"]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+script = ExtResource("1_shade")
+
+; ================================================================
+; 结构完全对齐 main.tscn 里的 OptionPanel（只是贴到底部）：
+;     OptionPanel (PanelContainer)
+;       └ ButtonMargins (MarginContainer)
+;           └ OptionButtons (HBoxContainer)
+;               └ 五个圆形按钮
+;
+; 几何和顶部那块面板一模一样，只是翻到下面：
+;     顶部面板：offset -200 ~ -10（锚在竖直中心）→ 屏幕最上面 190px
+;     这块面板：offset -200 ~ -10（锚在屏幕底边）→ 屏幕最下面 190px
+; 内边距同理翻过来：顶部面板留 margin_top，这里留 margin_bottom。
+; ================================================================
+[node name="OptionPanel" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.5
+anchor_right = 0.5
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = -600.0
+offset_top = -200.0
+offset_right = 600.0
+offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_styles/panel = SubResource("StyleBoxFlat_shade_panel")
+
+[node name="ButtonMargins" type="MarginContainer" parent="OptionPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 25
+theme_override_constants/margin_bottom = 40
+theme_override_constants/margin_right = 25
+
+; alignment = 1（居中）：五个按钮总共 5×150 + 4×50 = 950px，
+; 面板内宽 1150px —— 居中后左右各余 100px，跟顶部那排观感一致。
+[node name="OptionButtons" type="HBoxContainer" parent="OptionPanel/ButtonMargins"]
+layout_mode = 2
+theme_override_constants/separation = 50
+alignment = 1
+
+; ⚠️ 五个按钮的 icon 留空，图标后期自己加：
+;    选中按钮 → 右侧检查器 → Icon → 拖一张 svg 进来即可（跟 resources/ 里那些图标同一做法）。
+;    图标大小不满意的话，同一面板里还有 Expand Mode / Icon Max Width 可调。
+;
+; ⚠️ 节点名要和 scripts/shade_set_page.gd 的 BUTTON_VALUES 对得上：
+;    XRay / ShadingWire / ShadingSolid / ShadingTexture / ShadingRendered
+
+[node name="XRay" type="Button" parent="OptionPanel/ButtonMargins/OptionButtons"]
+custom_minimum_size = Vector2(150, 150)
+layout_mode = 2
+tooltip_text = "X-Ray"
+theme_override_styles/normal = SubResource("StyleBoxFlat_shade_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_shade_pressed")
+theme_override_styles/hover = SubResource("StyleBoxFlat_shade_hover")
+theme_override_styles/hover_pressed = SubResource("StyleBoxFlat_shade_hover_pressed")
+toggle_mode = true
+
+[node name="ShadingWire" type="Button" parent="OptionPanel/ButtonMargins/OptionButtons"]
+custom_minimum_size = Vector2(150, 150)
+layout_mode = 2
+tooltip_text = "Shading Wire"
+theme_override_styles/normal = SubResource("StyleBoxFlat_shade_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_shade_pressed")
+theme_override_styles/hover = SubResource("StyleBoxFlat_shade_hover")
+theme_override_styles/hover_pressed = SubResource("StyleBoxFlat_shade_hover_pressed")
+toggle_mode = true
+button_group = SubResource("ButtonGroup_shading")
+
+[node name="ShadingSolid" type="Button" parent="OptionPanel/ButtonMargins/OptionButtons"]
+custom_minimum_size = Vector2(150, 150)
+layout_mode = 2
+tooltip_text = "Shading Solid"
+theme_override_styles/normal = SubResource("StyleBoxFlat_shade_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_shade_pressed")
+theme_override_styles/hover = SubResource("StyleBoxFlat_shade_hover")
+theme_override_styles/hover_pressed = SubResource("StyleBoxFlat_shade_hover_pressed")
+toggle_mode = true
+button_group = SubResource("ButtonGroup_shading")
+
+[node name="ShadingTexture" type="Button" parent="OptionPanel/ButtonMargins/OptionButtons"]
+custom_minimum_size = Vector2(150, 150)
+layout_mode = 2
+tooltip_text = "Shading Texture"
+theme_override_styles/normal = SubResource("StyleBoxFlat_shade_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_shade_pressed")
+theme_override_styles/hover = SubResource("StyleBoxFlat_shade_hover")
+theme_override_styles/hover_pressed = SubResource("StyleBoxFlat_shade_hover_pressed")
+toggle_mode = true
+button_group = SubResource("ButtonGroup_shading")
+
+[node name="ShadingRendered" type="Button" parent="OptionPanel/ButtonMargins/OptionButtons"]
+custom_minimum_size = Vector2(150, 150)
+layout_mode = 2
+tooltip_text = "Shading Rendered"
+theme_override_styles/normal = SubResource("StyleBoxFlat_shade_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_shade_pressed")
+theme_override_styles/hover = SubResource("StyleBoxFlat_shade_hover")
+theme_override_styles/hover_pressed = SubResource("StyleBoxFlat_shade_hover_pressed")
+toggle_mode = true
+button_group = SubResource("ButtonGroup_shading")
+
+; 注意：原来这里有一个全屏不透明白色 ColorRect，已经删掉 ——
+; 着色页要能看见后面的视频画面（ShadeSetButton 也在 setting.gd 的
+; NO_BLUR_BUTTONS 里，就是为了这个），全屏白底会把画面整个盖住。
+

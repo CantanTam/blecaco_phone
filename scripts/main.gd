@@ -9,12 +9,15 @@ extends Control
 #   fps         推流帧率 ┐
 #   quality     推流画质 ├ 手机连上时的「校准」用，见 addon_set.gd
 #   smooth      平滑程度 ┘
+#   cameras     摄像机列表 + 活动摄像机    见 camera_select.gd
+#   shading     3D 视图的着色方式 + X-Ray  见 shade_set_page.gd
 const BLENDER_SETTING_KEYS := {
 	"output_fps": "blender/output_fps",
 	"fps": "blender/fps",
 	"quality": "blender/quality",
 	"smooth": "blender/smooth",
 	"cameras": "blender/cameras",
+	"shading": "blender/shading",
 }
 
 @onready var qr_code = $QRCode
@@ -51,16 +54,12 @@ func _on_text_message_received(message: String) -> void:
 	var raw: Variant = data.get("value")
 	var key: String = BLENDER_SETTING_KEYS[setting_name]
 
-	# 摄像机状态是个字典：{"active": 活动摄像机名, "names": [名字...]}
-	# 由 camera_select.gd 读出来渲染成列表（见那边的说明）。
+	# 收到的是字典类型的状态：摄像机列表、着色方式……都是整份覆盖。
+	# 具体由各页面读出来用（camera_select.gd / shade_set_page.gd）。
 	if raw is Dictionary:
 		Options.set_value(key, raw, false)
 		print(
-			"[Main] Blender 同步摄像机：%s 台，活动 = %s"
-			% [
-				str((raw as Dictionary).get("names", []).size()),
-				str((raw as Dictionary).get("active", ""))
-			]
+			"[Main] Blender 同步 %s：%s" % [setting_name, str(raw)]
 		)
 		return
 

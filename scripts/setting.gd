@@ -12,6 +12,9 @@ extends Control
 @onready var active_came_set_button: Button = (
 	$OptionPanel/ButtonMargins/OptionButtons/ActiveCameSetButton
 )
+@onready var shade_set_button: Button = (
+	$OptionPanel/ButtonMargins/OptionButtons/ShadeSetButton
+)
 # ============================================================
 # 选项面板唤出时，盖在 stream 上面的「半透明 + 模糊」遮罩
 #
@@ -99,6 +102,7 @@ func _ready() -> void:
 	mode_set_button.toggled.connect(_on_mode_set_toggled)
 	addon_set_button.toggled.connect(_on_addon_set_toggled)
 	active_came_set_button.toggled.connect(_on_active_came_set_toggled)
+	shade_set_button.toggled.connect(_on_shade_set_toggled)
 
 	# 上面那几个「不要模糊」的按钮：按下/松开时重新决定遮罩要不要显示
 	for button_name in NO_BLUR_BUTTONS:
@@ -220,9 +224,23 @@ func _finish_hide() -> void:
 	for child in content_host.get_children():
 		child.queue_free()
 
-	mode_set_button.set_pressed_no_signal(false)
+	# ⚠️ 要把 OptionButtons 里的按钮**全部**弹起来，不能只弹模式按钮：
+	#    按着 ShadeSet / AddonSet / ActiveCameSet 之类往上滑把面板收起时，
+	#    那个按钮会一直停在「按下」的样子，下次唤出面板就是「按钮亮着
+	#    但 ContentHost 里没有内容」，还得再点两下才回到正常。
+	_unpress_option_buttons()
 
 	print("[Setting] OptionPanel 已隐藏，设置界面已关闭")
+
+
+## 把 OptionButtons 里的按钮全部弹起来（不触发 toggled 信号）。
+##
+## ⚠️ 用 set_pressed_no_signal()：这里只是「复位界面」，
+##    不能当成用户按下，否则会连带去实例化 / 销毁页面。
+func _unpress_option_buttons() -> void:
+	for child in option_buttons.get_children():
+		if child is Button:
+			(child as Button).set_pressed_no_signal(false)
 	
 	
 func _on_mode_set_toggled(is_toggled: bool) -> void:
@@ -353,6 +371,40 @@ func _on_active_came_set_toggled(is_toggled: bool) -> void:
 
 	content_host.add_child(page)
 	print("[Setting] 已打开 CameraSelect")
+
+
+## 点 ShadeSetButton 时调用：把 shade_set_page.tscn 实例化到 ContentHost 下面。
+##
+## 和上面几个一样 —— 这些按钮共用一个 ButtonGroup，按下这个会自动松开
+## 其它按钮，那边清空 content_host 的行会先跑，这里再加新页面，
+## 同一时刻只有一个页面在。
+##
+## ⚠️ 这个页面本身不需要额外喂数据：它自己从 Options 读 Blender 推来的着色状态，
+##    并且会主动向 Blender 要一次（见 scripts/shade_set_page.gd）。
+func _on_shade_set_toggled(is_toggled: bool) -> void:
+	for child in content_host.get_children():
+		child.queue_free()
+
+	if not is_toggled:
+		print("[Setting] 已关闭 ShadeSet")
+		return
+
+	var packed_scene := load(
+		"res://scenes/shade_set_page.tscn"
+	) as PackedScene
+
+	if packed_scene == null:
+		push_error("[Setting] 找不到 shade_set_page.tscn")
+		return
+
+	var page := packed_scene.instantiate() as Control
+
+	if page == null:
+		push_error("[Setting] shade_set_page.tscn 的根节点必须是 Control")
+		return
+
+	content_host.add_child(page)
+	print("[Setting] 已打开 ShadeSet")
 
 
 # ============================================================
@@ -502,9 +554,7 @@ func _on_qr_visibility_changed() -> void:
 	for child in content_host.get_children():
 		child.queue_free()
 
-	for child in option_buttons.get_children():
-		if child is Button:
-			(child as Button).set_pressed_no_signal(false)
+	_unpress_option_buttons()
 
 	# 面板是被强制收起的，不走淡入动画 —— 模式场景立刻恢复可见
 	if active_mode_host != null:
