@@ -1,0 +1,47 @@
+%YAML:1.0
+# ⚠️ 【通用默认配置】IMU 噪声按消费级手机 MEMS 的典型值 ×10（官方建议放大 10~20×
+# 以覆盖未建模误差）。不针对任何特定型号。
+%YAML:1.0
+
+imu0:
+  T_i_b:
+    - [1.0, 0.0, 0.0, 0.0]
+    - [0.0, 1.0, 0.0, 0.0]
+    - [0.0, 0.0, 1.0, 0.0]
+    - [0.0, 0.0, 0.0, 1.0]
+  accelerometer_noise_density: 2.0000e-2   # 原始 2.0e-3 ×10（官方: 噪声放大 10~20× 以覆盖未建模误差）  # [ m / s^2 / sqrt(Hz) ]   ( accel "white noise" )
+  accelerometer_random_walk: 3.0000e-2     # 原始 3.0e-3 ×10    # [ m / s^3 / sqrt(Hz) ].  ( accel bias diffusion )
+  gyroscope_noise_density: 1.6968e-03      # 原始 1.6968e-4 ×10     # [ rad / s / sqrt(Hz) ]   ( gyro "white noise" )
+  gyroscope_random_walk: 1.9393e-04        # 原始 1.9393e-5 ×10       # [ rad / s^2 / sqrt(Hz) ] ( gyro bias diffusion )
+  rostopic: /imu0
+  time_offset: 0.0
+  update_rate: 200.0
+  # three different modes supported:
+  # "calibrated" (same as "kalibr"), "kalibr", "rpng"
+  model: "kalibr"
+  # how to get from Kalibr imu.yaml result file:
+  #   - Tw is imu0:gyroscopes:M:
+  #   - R_IMUtoGYRO: is imu0:gyroscopes:C_gyro_i:
+  #   - Ta is imu0:accelerometers:M:
+  #   - R_IMUtoACC not used by Kalibr
+  #   - Tg is imu0:gyroscopes:A:
+  Tw:
+    - [ 1.0, 0.0, 0.0 ]
+    - [ 0.0, 1.0, 0.0 ]
+    - [ 0.0, 0.0, 1.0 ]
+  R_IMUtoGYRO:
+    - [ 1.0, 0.0, 0.0 ]
+    - [ 0.0, 1.0, 0.0 ]
+    - [ 0.0, 0.0, 1.0 ]
+  Ta:
+    - [ 1.0, 0.0, 0.0 ]
+    - [ 0.0, 1.0, 0.0 ]
+    - [ 0.0, 0.0, 1.0 ]
+  R_IMUtoACC:
+    - [ 1.0, 0.0, 0.0 ]
+    - [ 0.0, 1.0, 0.0 ]
+    - [ 0.0, 0.0, 1.0 ]
+  Tg:
+    - [ 0.0, 0.0, 0.0 ]
+    - [ 0.0, 0.0, 0.0 ]
+    - [ 0.0, 0.0, 0.0 ]

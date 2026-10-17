@@ -36,6 +36,14 @@ var free_mode_initialized: bool = false
 #  - 切过去前会先停掉光流的 NativeCamera（Android 同一时刻只允许一个相机客户端持有摄像头）。
 #  - OpenVINS 输出是**米**（机体系下的相对位移），所以协议里带 "unit": "meter"；
 #    Blender 的 free_action.py 按 unit 选比例，缺省 "pixel" 时就是原来的光流路径。
+# 随 APK 分发的【通用配置】（res://config/，由 export include_filter 打包）。
+# 手机外部私有目录里若已有同名文件则**不覆盖**（现场调参优先）。
+const BUNDLED_CONFIG_FILES := [
+	"estimator_config.yaml",
+	"kalibr_imu_chain.yaml",
+	"kalibr_imucam_chain.yaml",
+]
+
 const POSE_SOURCE_FLOW := "flow"
 const POSE_SOURCE_OPENVINS := "openvins"
 
@@ -121,6 +129,9 @@ func _ready() -> void:
 			"action_sending_changed",
 			_on_action_sending_changed
 		)
+
+	# 尽早把 APK 内置的通用配置释放到手机（幂等；已有则跳过）
+	_ensure_bundled_config()
 
 	if ready_dot != null:
 		# 小圆点不拦触摸（同 RecordButton 的 Indicator 写法）
@@ -214,6 +225,7 @@ func _process(delta: float) -> void:
 			if _ov_retry_timer >= OPENVINS_RETRY_GAP_SEC:
 				_ov_retry_timer = 0.0
 				_ov_retries_left -= 1
+				_ensure_bundled_config()
 				if openvins.start("", ""):
 					print("[OpenVINS] 重试成功")
 				elif _ov_retries_left <= 0:
@@ -281,6 +293,8 @@ func _apply_pose_source() -> void:
 		_ov_ready = false
 		_ov_retries_left = OPENVINS_START_RETRIES
 		_ov_retry_timer = 0.0
+
+		_ensure_bundled_config()
 
 		if not openvins.start("", ""):
 			# 不立刻放弃：相机的让出是异步的，留给 _process 重试
@@ -406,3 +420,69 @@ func _on_action_sending_changed(enabled: bool) -> void:
 		print("[OpenVINS] Link 恢复：已重新校准手机姿态")
 	else:
 		push_warning("[OpenVINS] Link 恢复：手机姿态重新校准失败（暂无数据？）")
+
+
+## 确保手机上有一份配置：没有才从 APK 内置的 res://config/ 复制过去。
+## 手机上已存在的文件**一律不覆盖** —— 方便现场调参，也避免升级 APK 冲掉调好的参数。
+func _ensure_bundled_config() -> void:
+	if openvins == null or not openvins.is_available():
+		return
+
+	# 注意：openvins 是 GDScript 包装节点（addons/OpenVINSGodot/OpenVINSGodot.gd），
+	# 它对外暴露的是 external_files_dir()（内部再去调单例的 getExternalFilesDir()）。
+	if not openvins.has_method("external_files_dir"):
+		push_warning("[OpenVINS] 包装层缺少 external_files_dir()，跳过内置配置释放")
+		return
+
+	var root: String = str(openvins.call("external_files_dir"))
+	if root.is_empty():
+		push_warning("[OpenVINS] 拿不到外部私有目录，跳过内置配置释放")
+		return
+
+	var dir_path: String = root + "/config"
+	DirAccess.make_dir_recursive_absolute(dir_path)
+
+	for file_name in BUNDLED_CONFIG_FILES:
+		var dst: String = dir_path + "/" + file_name
+		var src: String = "res://config/" + file_name
+
+		# 手机上已有 → 保留（但做一次"是否像 OpenCV yaml"的最小校验：
+		# OpenCV 的 FileStorage 要求第一行是 %YAML:，否则会抛异常并让整进程 abort。
+		# 校验不通过就当它损坏，用内置版本覆盖 —— 属于自愈，不会误伤正常配置。
+		if FileAccess.file_exists(dst):
+			if _looks_like_opencv_yaml(dst):
+				continue
+			push_warning("[OpenVINS] 手机上的配置无效，改用内置版本: " + dst)
+
+		if not FileAccess.file_exists(src):
+			push_warning("[OpenVINS] APK 内置配置缺失: " + src)
+			continue
+
+		# 内置文件自身也要合法，否则不复制（避免把坏的铺到手机上）
+		if not _looks_like_opencv_yaml(src):
+			push_warning("[OpenVINS] APK 内置配置格式不对（首行应为 %YAML:）: " + src)
+			continue
+
+		var bytes: PackedByteArray = FileAccess.get_file_as_bytes(src)
+		if bytes.is_empty():
+			push_warning("[OpenVINS] 内置配置为空: " + src)
+			continue
+
+		var f := FileAccess.open(dst, FileAccess.WRITE)
+		if f == null:
+			push_warning("[OpenVINS] 无法写入配置: " + dst)
+			continue
+		f.store_buffer(bytes)
+		f.close()
+		print("[OpenVINS] 已释放内置配置 → " + dst)
+
+
+## OpenCV FileStorage 只认首行 %YAML:；用它做最小合法性校验
+func _looks_like_opencv_yaml(path: String) -> bool:
+	var f := FileAccess.open(path, FileAccess.READ)
+	if f == null:
+		return false
+	var first_line := f.get_line()
+	f.close()
+	# GDScript 的 lstrip() 需要参数，用 strip_edges() 更省事
+	return first_line.strip_edges().begins_with("%YAML:")
