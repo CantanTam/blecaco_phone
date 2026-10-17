@@ -69,14 +69,28 @@ const OPENVINS_RESTART_RELEASE_SEC := 1.0    # 先等相机真正释放
 const OPENVINS_RESTART_VERIFY_SEC := 4.0     # 等"帧恢复"的上限
 const OPENVINS_RESTART_MAX_TRIES := 3
 
+# 位姿来源切换的冷却时间（秒）。
+# ⚠️ 必须要有：第三方 NativeCameraPlugin 在相机被快速反复开关时，
+# 它的 onConfigured 会对已置空的 CameraDevice 调 createCaptureRequest →
+# NullPointerException（CameraCaptureThread）→ 整个 App 崩掉。
+# 冷却期内忽略点击，保证相机交接是"单飞"的。
+const POSE_SWITCH_COOLDOWN_SEC := 2.0
+
 @onready var optical_flow: Node = $OpticalFlowController
 @onready var openvins: Node = $OpenVINS
 @onready var pose_source_button: Button = $PoseSourceButton
-@onready var ready_dot: Panel = $PoseSourceButton/ReadyDot
 
-# 就绪指示点颜色：启动中=琥珀，已出位姿=绿
-const READY_DOT_STARTING := Color(0.95, 0.65, 0.15, 1.0)
-const READY_DOT_READY := Color(0.20, 0.85, 0.35, 1.0)
+# 同一个按钮用两个 icon 表示两种状态（把你的图标放到这两个路径即可，或改这里的路径）
+const ICON_FLOW_PATH := "res://resources/OpticalFlow.svg"
+const ICON_VIO_PATH := "res://resources/OpenVINS.svg"
+var _tex_flow: Texture2D = null
+var _tex_vio: Texture2D = null
+
+# ── 两个按钮的颜色状态（统一 50% 半透明）──
+const BTN_COLOR_WHITE := Color(0.0, 0.0, 0.0, 0.5)       # 常规：半透明白
+const BTN_COLOR_PREPARING := Color(1.0, 1.0, 0.0, 0.5)   # #ffff00 · 初始化校正尚未完成
+const BTN_COLOR_READY := Color(0.0, 1.0, 0.0, 0.5)       # #00ff00 · 初始化校正完成
+const BTN_READY_GREEN_SEC := 3.0                         # 绿色保持时长（秒）
 
 var pose_source: String = POSE_SOURCE_FLOW
 
@@ -85,8 +99,11 @@ var _ov_last_pos: Vector3 = Vector3.ZERO
 var _ov_has_last: bool = false
 var _ov_pending: Vector3 = Vector3.ZERO
 
-var _dot_style: StyleBoxFlat = null
+var _btn_style: StyleBoxFlat = null
+var _vio_green_timer: float = -1.0   # >0 表示绿色倒计时中
 enum OvRestart { NONE, WAIT_RELEASE, VERIFY }
+var _switch_cooldown: float = 0.0
+
 var _ov_restart_state: int = OvRestart.NONE
 var _ov_restart_timer: float = 0.0
 var _ov_restart_tries: int = 0
@@ -130,10 +147,21 @@ func _ready() -> void:
 			"[Orientation] Connection.send_action() not found"
 		)
 
-	# 位姿来源切换按钮（默认光流）
+	# 两个按钮分别代表两种位姿来源，共用同一位置（同一时刻只显示一个）
+	# 单按钮 + 双 icon：点一下 = 在"光流 / VIO"之间切换
+	# ⚠️ 不连 button.pressed：实测该区域在 GUI 阶段被上层控件吃掉（触摸到了、按钮收不到），
+	#    改由 _input() 做矩形命中检测（_input 一定先于 GUI 收到），见 _input()。
 	if pose_source_button != null:
-		# toggle 按钮：未按下=光流（白色透明）、按下=OpenVINS（白色不透明）
-		pose_source_button.toggled.connect(_on_pose_source_toggled)
+		pose_source_button.focus_mode = Control.FOCUS_NONE
+		_btn_style = _dup_button_style(pose_source_button)
+
+	# 载入两个状态图标（缺失时退化为文字，不会崩）
+	if ResourceLoader.exists(ICON_FLOW_PATH):
+		_tex_flow = load(ICON_FLOW_PATH)
+	if ResourceLoader.exists(ICON_VIO_PATH):
+		_tex_vio = load(ICON_VIO_PATH)
+	if _tex_flow == null or _tex_vio == null:
+		push_warning("[OpenVINS] 状态图标缺失，改用文字显示（可放到 %s / %s）" % [ICON_FLOW_PATH, ICON_VIO_PATH])
 
 	if connection_node != null and connection_node.has_signal("action_sending_changed"):
 		# LinkButton 恢复发送时：把手机"当前姿态"当成新的零点重新校准，
@@ -146,18 +174,25 @@ func _ready() -> void:
 	# 尽早把 APK 内置的通用配置释放到手机（幂等；已有则跳过）
 	_ensure_bundled_config()
 
-	if ready_dot != null:
-		# 小圆点不拦触摸（同 RecordButton 的 Indicator 写法）
-		ready_dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var dot_style := ready_dot.get_theme_stylebox("panel")
-		if dot_style is StyleBoxFlat:
-			_dot_style = dot_style.duplicate() as StyleBoxFlat
-			ready_dot.add_theme_stylebox_override("panel", _dot_style)
+
 
 	_apply_pose_source()
 
+	# ── 临时诊断：确认按钮在屏幕上的真实位置 vs 视口大小 ──
+	if pose_source_button != null:
+		print(
+			"[DBG] PoseSourceButton global_rect=%s  viewport=%s"
+			% [
+				str(pose_source_button.get_global_rect()),
+				str(get_viewport().get_visible_rect().size)
+			]
+		)
+
 
 func _process(delta: float) -> void:
+	if _switch_cooldown > 0.0:
+		_switch_cooldown = maxf(_switch_cooldown - delta, 0.0)
+
 	if not rotation_sender.has_orientation_data():
 		return
 
@@ -233,6 +268,13 @@ func _process(delta: float) -> void:
 
 	# OpenVINS 模式下，平移由 VIO 提供（光流控制器此时已被停掉）
 	if pose_source == POSE_SOURCE_OPENVINS:
+		# 绿色 3 秒 → 转半透明白
+		if _vio_green_timer > 0.0:
+			_vio_green_timer -= delta
+			if _vio_green_timer <= 0.0:
+				_vio_green_timer = -1.0
+				_set_vio_button_color(BTN_COLOR_WHITE)
+
 		# 正在安全重启：推进状态机，重启期间不发任何位移（避免用到过期位姿）
 		if _ov_restart_state != OvRestart.NONE:
 			_update_vio_restart(delta)
@@ -273,7 +315,16 @@ func _process(delta: float) -> void:
 # 位姿来源切换（光流 ⇄ OpenVINS）
 # ============================================================
 
+## 点按钮 → 在两种位姿来源之间切换
+func _on_pose_button_pressed() -> void:
+	print("[OpenVINS] 按钮被点击，当前来源=", pose_source)
+	_on_pose_source_toggled(pose_source != POSE_SOURCE_OPENVINS)
+
+
 func _on_pose_source_toggled(pressed: bool) -> void:
+	# 切换后进入冷却：期间的点击直接忽略（避免相机被快速反复开关 → 第三方插件 NPE 崩溃）
+	_switch_cooldown = POSE_SWITCH_COOLDOWN_SEC
+
 	pose_source = (
 		POSE_SOURCE_OPENVINS if pressed else POSE_SOURCE_FLOW
 	)
@@ -283,11 +334,16 @@ func _on_pose_source_toggled(pressed: bool) -> void:
 func _apply_pose_source() -> void:
 	var use_openvins := pose_source == POSE_SOURCE_OPENVINS
 
+	# 同一个按钮：换 icon + 换颜色
 	if pose_source_button != null:
-		# set_pressed_no_signal：避免程序化改状态又触发 toggled 造成递归
-		pose_source_button.set_pressed_no_signal(use_openvins)
-		# 文字只标"来源"；就绪与否看右下角小圆点
-		pose_source_button.text = "VIO" if use_openvins else "光流"
+		if _tex_flow != null and _tex_vio != null:
+			pose_source_button.icon = _tex_vio if use_openvins else _tex_flow
+			pose_source_button.text = ""
+		else:
+			pose_source_button.text = "VIO" if use_openvins else "光流"
+
+	_vio_green_timer = -1.0
+	_set_vio_button_color(BTN_COLOR_PREPARING if use_openvins else BTN_COLOR_WHITE)
 
 	if use_openvins:
 		# ① 先让出摄像头：停光流相机 + 停它的发送
@@ -325,7 +381,7 @@ func _apply_pose_source() -> void:
 					OPENVINS_START_RETRIES
 				]
 			)
-			_set_ready_dot(false, true)
+			_set_vio_button_color(BTN_COLOR_PREPARING)
 			return
 
 		print("[OpenVINS] 已切到位姿来源：OpenVINS")
@@ -337,7 +393,7 @@ func _apply_pose_source() -> void:
 		_ov_restart_timer = 0.0
 		_ov_has_last = false
 		_ov_pending = Vector3.ZERO
-		_set_ready_dot(false, false)
+		_vio_green_timer = -1.0
 		if openvins != null and openvins.is_available():
 			openvins.stop()
 
@@ -368,8 +424,10 @@ func _send_openvins_translation() -> void:
 
 	if not _ov_ready:
 		_ov_ready = true
-		_set_ready_dot(true, true)
-		print("[OpenVINS] VIO 已给出位姿，切换完成")
+		# 初始化校正完成：先绿 3 秒，然后转半透明白
+		_set_vio_button_color(BTN_COLOR_READY)
+		_vio_green_timer = BTN_READY_GREEN_SEC
+		print("[OpenVINS] VIO 初始化校正完成（按钮先绿 %.0f 秒）" % BTN_READY_GREEN_SEC)
 
 	var step_cam := _openvins_step(p, q)
 	if step_cam == Vector3.ZERO:
@@ -421,15 +479,22 @@ func _openvins_step(p: Vector3, q: Quaternion) -> Vector3:
 	return q.inverse() * step_world
 
 
-## 右下角就绪指示点：visible=false 表示"当前是光流"；否则用颜色表示 VIO 状态
-func _set_ready_dot(ready: bool, show: bool) -> void:
-	if ready_dot == null:
-		return
-	ready_dot.visible = show
-	if not show:
-		return
-	if _dot_style != null:
-		_dot_style.bg_color = READY_DOT_READY if ready else READY_DOT_STARTING
+## 设置 VIO 按钮背景色（只改 duplicated StyleBoxFlat 的 bg_color）
+func _set_vio_button_color(color: Color) -> void:
+	if _btn_style != null:
+		_btn_style.bg_color = color
+
+
+## 复制按钮样式，让四个状态共用一个 StyleBoxFlat，方便运行时按状态改颜色
+func _dup_button_style(btn: Button) -> StyleBoxFlat:
+	var base := btn.get_theme_stylebox("normal")
+	if not (base is StyleBoxFlat):
+		return null
+	var style := (base as StyleBoxFlat).duplicate() as StyleBoxFlat
+	for state in ["normal", "hover", "pressed", "hover_pressed"]:
+		btn.add_theme_stylebox_override(state, style)
+	return style
+
 
 ## LinkButton 暂停/恢复 action 发送时同步
 func _on_action_sending_changed(enabled: bool) -> void:
@@ -448,13 +513,13 @@ func _on_action_sending_changed(enabled: bool) -> void:
 
 
 ## 确保手机上有一份配置：没有才从 APK 内置的 res://config/ 复制过去。
-## 手机上已存在的文件**一律不覆盖** —— 方便现场调参，也避免升级 APK 冲掉调好的参数。
+## 手机上已存在的文件**一律不覆盖**（现场调参优先）；但若内容明显损坏（首行不是 %YAML:）
+## 就用内置版本覆盖 —— OpenCV 的 FileStorage 遇到非法 yaml 会抛异常并让整进程 abort。
 func _ensure_bundled_config() -> void:
 	if openvins == null or not openvins.is_available():
 		return
 
-	# 注意：openvins 是 GDScript 包装节点（addons/OpenVINSGodot/OpenVINSGodot.gd），
-	# 它对外暴露的是 external_files_dir()（内部再去调单例的 getExternalFilesDir()）。
+	# openvins 是 GDScript 包装节点，对外方法是 external_files_dir()
 	if not openvins.has_method("external_files_dir"):
 		push_warning("[OpenVINS] 包装层缺少 external_files_dir()，跳过内置配置释放")
 		return
@@ -471,19 +536,15 @@ func _ensure_bundled_config() -> void:
 		var dst: String = dir_path + "/" + file_name
 		var src: String = "res://config/" + file_name
 
-		# 手机上已有 → 保留（但做一次"是否像 OpenCV yaml"的最小校验：
-		# OpenCV 的 FileStorage 要求第一行是 %YAML:，否则会抛异常并让整进程 abort。
-		# 校验不通过就当它损坏，用内置版本覆盖 —— 属于自愈，不会误伤正常配置。
 		if FileAccess.file_exists(dst):
 			if _looks_like_opencv_yaml(dst):
-				continue
+				continue   # 手机上已有且看起来合法 → 保留
 			push_warning("[OpenVINS] 手机上的配置无效，改用内置版本: " + dst)
 
 		if not FileAccess.file_exists(src):
 			push_warning("[OpenVINS] APK 内置配置缺失: " + src)
 			continue
 
-		# 内置文件自身也要合法，否则不复制（避免把坏的铺到手机上）
 		if not _looks_like_opencv_yaml(src):
 			push_warning("[OpenVINS] APK 内置配置格式不对（首行应为 %YAML:）: " + src)
 			continue
@@ -509,15 +570,14 @@ func _looks_like_opencv_yaml(path: String) -> bool:
 		return false
 	var first_line := f.get_line()
 	f.close()
-	# GDScript 的 lstrip() 需要参数，用 strip_edges() 更省事
 	return first_line.strip_edges().begins_with("%YAML:")
 
 
 # ============================================================
-# VIO 安全重启（用于 unlink→link，要求重新校准初始化）
+# VIO 安全重启（unlink→link 时要求重新校准初始化）
 # ============================================================
 
-## 发起重启：先停、清状态，然后交给 _process 的状态机去"等相机释放 → 启动 → 验证帧"
+## 发起重启：先停、清状态，交给 _process 的状态机"等相机释放 → 启动 → 验证帧"
 func _begin_vio_restart() -> void:
 	if openvins == null or not openvins.is_available():
 		return
@@ -533,7 +593,8 @@ func _begin_vio_restart() -> void:
 	_ov_restart_tries = 0
 	_ov_restart_timer = 0.0
 	_ov_restart_state = OvRestart.WAIT_RELEASE
-	_set_ready_dot(false, true)   # 圆点：琥珀=准备中
+	_vio_green_timer = -1.0
+	_set_vio_button_color(BTN_COLOR_PREPARING)   # 黄：重新校准中
 
 
 ## 状态机：WAIT_RELEASE（等相机释放）→ start() → VERIFY（等帧恢复）
@@ -568,7 +629,8 @@ func _update_vio_restart(delta: float) -> void:
 			if now_frames > _ov_frames_mark:
 				_ov_restart_state = OvRestart.NONE
 				_ov_restart_timer = 0.0
-				_set_ready_dot(false, true)
+				_vio_green_timer = -1.0
+				_set_vio_button_color(BTN_COLOR_PREPARING)
 				print("[OpenVINS] VIO 已重启完成（帧已恢复），等待重新初始化")
 			elif _ov_restart_timer >= OPENVINS_RESTART_VERIFY_SEC:
 				_ov_restart_timer = 0.0
@@ -588,7 +650,7 @@ func _update_vio_restart(delta: float) -> void:
 					_ov_restart_state = OvRestart.WAIT_RELEASE
 
 
-## 多次尝试仍拿不到帧 → 退回光流（避免卡在"看不见的死状态"）
+## 多次尝试仍拿不到帧 → 退回光流（不留"看不见的死状态"）
 func _give_up_vio_restart() -> void:
 	_ov_restart_state = OvRestart.NONE
 	_ov_restart_timer = 0.0
@@ -598,3 +660,33 @@ func _give_up_vio_restart() -> void:
 	)
 	pose_source = POSE_SOURCE_FLOW
 	_apply_pose_source()
+
+
+## 触摸命中检测（绕过 GUI 被上层控件拦截的问题）
+func _input(event: InputEvent) -> void:
+	var pressed := false
+	var pos := Vector2.ZERO
+	if event is InputEventScreenTouch:
+		pressed = event.pressed
+		pos = event.position
+	elif event is InputEventMouseButton:
+		pressed = event.pressed
+		pos = event.position
+	if not pressed:
+		return
+
+	if pose_source_button == null or not pose_source_button.visible:
+		return
+
+	if pose_source_button.get_global_rect().has_point(pos):
+		get_viewport().set_input_as_handled()
+
+		if _switch_cooldown > 0.0:
+			print(
+				"[OpenVINS] 冷却中(剩 %.1fs)，忽略本次点击"
+				% _switch_cooldown
+			)
+			return
+
+		print("[OpenVINS] 命中按钮区域(%s)，当前来源=%s" % [str(pos), pose_source])
+		_on_pose_button_pressed()

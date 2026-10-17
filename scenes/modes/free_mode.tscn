@@ -3,39 +3,15 @@
 [ext_resource type="Script" uid="uid://s6ggvc81fx7" path="res://scripts/modes/free_mode.gd" id="1_cx1p0"]
 [ext_resource type="Script" uid="uid://d0c75k44l604q" path="res://scripts/modes/optical_flow_controller.gd" id="2_y5shr"]
 [ext_resource type="Script" uid="uid://iws2m5f75rfc" path="res://addons/NativeCameraPlugin/NativeCamera.gd" id="3_wmy0e"]
-[ext_resource type="Script" path="res://addons/OpenVINSGodot/OpenVINSGodot.gd" id="4_ovins"]
+[ext_resource type="Script" uid="uid://csbiqw15b4bm6" path="res://addons/OpenVINSGodot/OpenVINSGodot.gd" id="4_ovins"]
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ovs_normal"]
-bg_color = Color(1, 1, 1, 0.35)
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_btn50"]
+bg_color = Color(0, 0, 0, 0.627451)
 corner_radius_top_left = 60
 corner_radius_top_right = 60
 corner_radius_bottom_right = 60
 corner_radius_bottom_left = 60
 corner_detail = 20
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ovs_hover"]
-bg_color = Color(1, 1, 1, 0.6)
-corner_radius_top_left = 60
-corner_radius_top_right = 60
-corner_radius_bottom_right = 60
-corner_radius_bottom_left = 60
-corner_detail = 20
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ovs_pressed"]
-bg_color = Color(1, 1, 1, 1)
-corner_radius_top_left = 60
-corner_radius_top_right = 60
-corner_radius_bottom_right = 60
-corner_radius_bottom_left = 60
-corner_detail = 20
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ovs_dot"]
-bg_color = Color(0.45, 0.45, 0.45, 1)
-corner_radius_top_left = 12
-corner_radius_top_right = 12
-corner_radius_bottom_right = 12
-corner_radius_bottom_left = 12
-corner_detail = 12
 
 [node name="FreeMode" type="Control" unique_id=311837689]
 layout_mode = 3
@@ -59,32 +35,14 @@ script = ExtResource("4_ovins")
 
 [node name="PoseSourceButton" type="Button" parent="." unique_id=311837691]
 layout_mode = 1
-offset_left = 240.0
-offset_top = 40.0
-offset_right = 360.0
-offset_bottom = 160.0
+offset_left = 40.0
+offset_top = 240.0
+offset_right = 160.0
+offset_bottom = 360.0
 focus_mode = 0
-toggle_mode = true
-theme_override_colors/font_color = Color(0.15, 0.15, 0.15, 1)
-theme_override_colors/font_hover_color = Color(0.15, 0.15, 0.15, 1)
-theme_override_colors/font_pressed_color = Color(0.15, 0.15, 0.15, 1)
-theme_override_colors/font_hover_pressed_color = Color(0.15, 0.15, 0.15, 1)
-theme_override_font_sizes/font_size = 22
-theme_override_styles/normal = SubResource("StyleBoxFlat_ovs_normal")
-theme_override_styles/hover = SubResource("StyleBoxFlat_ovs_hover")
-theme_override_styles/pressed = SubResource("StyleBoxFlat_ovs_pressed")
-theme_override_styles/hover_pressed = SubResource("StyleBoxFlat_ovs_pressed")
-text = "光流"
-
-[node name="ReadyDot" type="Panel" parent="PoseSourceButton" unique_id=311837692]
-layout_mode = 1
-anchors_preset = -1
-offset_left = 84.0
-offset_top = 84.0
-offset_right = 108.0
-offset_bottom = 108.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-visible = false
-theme_override_styles/panel = SubResource("StyleBoxFlat_ovs_dot")
+theme_override_styles/normal = SubResource("StyleBoxFlat_btn50")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_btn50")
+theme_override_styles/hover = SubResource("StyleBoxFlat_btn50")
+theme_override_styles/hover_pressed = SubResource("StyleBoxFlat_btn50")
+icon_alignment = 1
+expand_icon = true
