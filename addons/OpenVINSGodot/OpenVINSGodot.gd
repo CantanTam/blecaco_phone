@@ -125,3 +125,17 @@ func _on_native_pose(dict: Dictionary) -> void:
 
 func _on_native_status(message: String) -> void:
 	status_changed.emit(message)
+
+
+## 已喂给 VIO 的相机帧数（用于判断 VIO 重启后帧是否恢复）
+func frame_count() -> int:
+	if _ov == null:
+		return 0
+	return int(_ov.getFrameCount())
+
+
+## 已喂给 VIO 的 IMU 采样数
+func imu_count() -> int:
+	if _ov == null:
+		return 0
+	return int(_ov.getImuSampleCount())

@@ -62,6 +62,13 @@ const OPENVINS_MIN_STEP_M := 0.002
 # 超过这个值就认为发生了重置：丢弃本次并清空攒批（20~50Hz 下 0.5m/帧 ≈ 10~25 m/s，正常手持到不了）。
 const OPENVINS_MAX_STEP_M := 0.5
 
+# ── VIO 安全重启（unlink→link 时要求"重新校准初始化"）──
+# 为什么不能同帧 stop+start：插件 stop() 是**异步**关 Camera2 设备，
+# 立刻 start() 会撞上没释放的相机 → onError → 之后再也收不到帧（曾经踩过这个坑）。
+const OPENVINS_RESTART_RELEASE_SEC := 1.0    # 先等相机真正释放
+const OPENVINS_RESTART_VERIFY_SEC := 4.0     # 等"帧恢复"的上限
+const OPENVINS_RESTART_MAX_TRIES := 3
+
 @onready var optical_flow: Node = $OpticalFlowController
 @onready var openvins: Node = $OpenVINS
 @onready var pose_source_button: Button = $PoseSourceButton
@@ -79,6 +86,12 @@ var _ov_has_last: bool = false
 var _ov_pending: Vector3 = Vector3.ZERO
 
 var _dot_style: StyleBoxFlat = null
+enum OvRestart { NONE, WAIT_RELEASE, VERIFY }
+var _ov_restart_state: int = OvRestart.NONE
+var _ov_restart_timer: float = 0.0
+var _ov_restart_tries: int = 0
+var _ov_frames_mark: int = 0
+
 var _ov_retries_left: int = 0
 var _ov_retry_timer: float = 0.0
 var _ov_ready: bool = false
@@ -220,6 +233,10 @@ func _process(delta: float) -> void:
 
 	# OpenVINS 模式下，平移由 VIO 提供（光流控制器此时已被停掉）
 	if pose_source == POSE_SOURCE_OPENVINS:
+		# 正在安全重启：推进状态机，重启期间不发任何位移（避免用到过期位姿）
+		if _ov_restart_state != OvRestart.NONE:
+			_update_vio_restart(delta)
+			return
 		if _ov_retries_left > 0 and not openvins.is_running():
 			_ov_retry_timer += delta
 			if _ov_retry_timer >= OPENVINS_RETRY_GAP_SEC:
@@ -288,6 +305,8 @@ func _apply_pose_source() -> void:
 			return
 
 		openvins.request_camera_permission()
+		_ov_restart_state = OvRestart.NONE
+		_ov_restart_timer = 0.0
 		_ov_has_last = false
 		_ov_pending = Vector3.ZERO
 		_ov_ready = false
@@ -314,6 +333,8 @@ func _apply_pose_source() -> void:
 		# 切回光流：停掉 VIO（省电 + 让出摄像头）
 		_ov_retries_left = 0
 		_ov_ready = false
+		_ov_restart_state = OvRestart.NONE
+		_ov_restart_timer = 0.0
 		_ov_has_last = false
 		_ov_pending = Vector3.ZERO
 		_set_ready_dot(false, false)
@@ -415,11 +436,15 @@ func _on_action_sending_changed(enabled: bool) -> void:
 	if not enabled:
 		return   # 暂停：什么都不用做（Blender 那边已收到 unlink 并存好相机旋转）
 
-	# 恢复：重新校准手机姿态（当前姿态 = 新零点），之后的旋转相对它输出
+	# ① 恢复：重新校准手机姿态（当前姿态 = 新零点），之后的旋转相对它输出
 	if rotation_sender.calibrate():
 		print("[OpenVINS] Link 恢复：已重新校准手机姿态")
 	else:
 		push_warning("[OpenVINS] Link 恢复：手机姿态重新校准失败（暂无数据？）")
+
+	# ② VIO 也要重新校准初始化（丢弃旧状态）：安全重启
+	if pose_source == POSE_SOURCE_OPENVINS:
+		_begin_vio_restart()
 
 
 ## 确保手机上有一份配置：没有才从 APK 内置的 res://config/ 复制过去。
@@ -486,3 +511,90 @@ func _looks_like_opencv_yaml(path: String) -> bool:
 	f.close()
 	# GDScript 的 lstrip() 需要参数，用 strip_edges() 更省事
 	return first_line.strip_edges().begins_with("%YAML:")
+
+
+# ============================================================
+# VIO 安全重启（用于 unlink→link，要求重新校准初始化）
+# ============================================================
+
+## 发起重启：先停、清状态，然后交给 _process 的状态机去"等相机释放 → 启动 → 验证帧"
+func _begin_vio_restart() -> void:
+	if openvins == null or not openvins.is_available():
+		return
+
+	print("[OpenVINS] 重启 VIO：准备重新校准初始化")
+
+	openvins.stop()
+
+	_ov_ready = false
+	_ov_has_last = false
+	_ov_pending = Vector3.ZERO
+	_ov_retries_left = 0
+	_ov_restart_tries = 0
+	_ov_restart_timer = 0.0
+	_ov_restart_state = OvRestart.WAIT_RELEASE
+	_set_ready_dot(false, true)   # 圆点：琥珀=准备中
+
+
+## 状态机：WAIT_RELEASE（等相机释放）→ start() → VERIFY（等帧恢复）
+func _update_vio_restart(delta: float) -> void:
+	_ov_restart_timer += delta
+
+	match _ov_restart_state:
+		OvRestart.WAIT_RELEASE:
+			if _ov_restart_timer < OPENVINS_RESTART_RELEASE_SEC:
+				return
+			_ov_restart_timer = 0.0
+			_ensure_bundled_config()
+			if openvins.start("", ""):
+				_ov_frames_mark = int(openvins.call("frame_count"))
+				_ov_restart_state = OvRestart.VERIFY
+				print("[OpenVINS] 重启已发起，验证帧是否恢复…")
+			else:
+				_ov_restart_tries += 1
+				print(
+					"[OpenVINS] 重启失败(%d/%d)：%s"
+					% [
+						_ov_restart_tries,
+						OPENVINS_RESTART_MAX_TRIES,
+						openvins.get_last_error()
+					]
+				)
+				if _ov_restart_tries >= OPENVINS_RESTART_MAX_TRIES:
+					_give_up_vio_restart()
+
+		OvRestart.VERIFY:
+			var now_frames := int(openvins.call("frame_count"))
+			if now_frames > _ov_frames_mark:
+				_ov_restart_state = OvRestart.NONE
+				_ov_restart_timer = 0.0
+				_set_ready_dot(false, true)
+				print("[OpenVINS] VIO 已重启完成（帧已恢复），等待重新初始化")
+			elif _ov_restart_timer >= OPENVINS_RESTART_VERIFY_SEC:
+				_ov_restart_timer = 0.0
+				_ov_restart_tries += 1
+				print(
+					"[OpenVINS] 重启后 %.1fs 没收到帧(%d/%d)，再试"
+					% [
+						OPENVINS_RESTART_VERIFY_SEC,
+						_ov_restart_tries,
+						OPENVINS_RESTART_MAX_TRIES
+					]
+				)
+				if _ov_restart_tries >= OPENVINS_RESTART_MAX_TRIES:
+					_give_up_vio_restart()
+				else:
+					openvins.stop()
+					_ov_restart_state = OvRestart.WAIT_RELEASE
+
+
+## 多次尝试仍拿不到帧 → 退回光流（避免卡在"看不见的死状态"）
+func _give_up_vio_restart() -> void:
+	_ov_restart_state = OvRestart.NONE
+	_ov_restart_timer = 0.0
+	push_warning(
+		"[OpenVINS] 重启 %d 次仍拿不到相机帧，退回光流"
+		% OPENVINS_RESTART_MAX_TRIES
+	)
+	pose_source = POSE_SOURCE_FLOW
+	_apply_pose_source()
