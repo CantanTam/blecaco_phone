@@ -104,6 +104,10 @@ var _vio_green_timer: float = -1.0   # >0 表示绿色倒计时中
 enum OvRestart { NONE, WAIT_RELEASE, VERIFY }
 var _switch_cooldown: float = 0.0
 
+# 触摸设备上 Godot 会把触摸同时模拟成鼠标事件 → 只处理其中一种，
+# 否则一次点击会触发两次切换（drone_mode 就这么踩过坑）。
+var _touch_platform: bool = false
+
 var _ov_restart_state: int = OvRestart.NONE
 var _ov_restart_timer: float = 0.0
 var _ov_restart_tries: int = 0
@@ -124,6 +128,11 @@ func _send_rate() -> float:
 
 
 func _ready() -> void:
+	_touch_platform = (
+		DisplayServer.is_touchscreen_available()
+		or OS.has_feature("mobile")
+	)
+
 	# 查找现有的 Connection 节点
 	connection_node = get_tree().root.find_child(
 		"Connection",
@@ -670,6 +679,8 @@ func _input(event: InputEvent) -> void:
 		pressed = event.pressed
 		pos = event.position
 	elif event is InputEventMouseButton:
+		if _touch_platform:
+			return
 		pressed = event.pressed
 		pos = event.position
 	if not pressed:
