@@ -100,6 +100,30 @@ corner_radius_bottom_right = 60
 corner_radius_bottom_left = 60
 corner_detail = 20
 
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_qnk50"]
+bg_color = Color(0, 0, 0, 0.627451)
+corner_radius_top_left = 45
+corner_radius_top_right = 45
+corner_radius_bottom_right = 45
+corner_radius_bottom_left = 45
+corner_detail = 20
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_hjqyh"]
+bg_color = Color(0, 0, 0, 0.627451)
+corner_radius_top_left = 45
+corner_radius_top_right = 45
+corner_radius_bottom_right = 45
+corner_radius_bottom_left = 45
+corner_detail = 20
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_tg0d5"]
+bg_color = Color(0, 0, 0, 0.627451)
+corner_radius_top_left = 45
+corner_radius_top_right = 45
+corner_radius_bottom_right = 45
+corner_radius_bottom_left = 45
+corner_detail = 20
+
 [node name="DroneMode" type="Control" unique_id=311837689]
 layout_mode = 3
 anchors_preset = 15
@@ -231,3 +255,17 @@ offset_bottom = 320.0
 theme_override_styles/normal = SubResource("StyleBoxFlat_wr66y")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_v3fqs")
 theme_override_styles/hover = SubResource("StyleBoxFlat_6psps")
+
+[node name="RotationSensitivityButton" type="Button" parent="." unique_id=1279197823]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -170.0
+offset_top = 350.0
+offset_right = -80.0
+offset_bottom = 440.0
+grow_horizontal = 0
+theme_override_styles/normal = SubResource("StyleBoxFlat_qnk50")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_hjqyh")
+theme_override_styles/hover = SubResource("StyleBoxFlat_tg0d5")

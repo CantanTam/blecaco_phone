@@ -63,6 +63,22 @@ const STICK_LIMIT_RADIUS: float = 225.0
 # 限向（暂时只做样式，不做真实功能）
 var LIMIT_ORIENTATION: bool = false
 
+# 旋转灵敏度倍率（一档/二档/三档）：三档 > 二档 > 一档
+# 0.35× ≈ 31°/s（慢摇/拍视频）· 1.0× = 90°/s（标准）· 1.6× ≈ 144°/s（快速修正）
+const ROTATION_SENSITIVITY_MULTIPLIERS: Array = [0.35, 1.0, 1.6]
+
+# 旋转灵敏度档位（0/1/2，点击循环）
+var ROTATION_SENSITIVITY: int = 0
+
+# 旋转灵敏度按钮的三个图标（索引 0/1/2 对应 One/Two/Three）
+const ICON_ROTATION_SENSITIVITY: Array = [
+	"res://resources/DroneRotationSensitivityOne.svg",
+	"res://resources/DroneRotationSensitivityTwo.svg",
+	"res://resources/DroneRotationSensitivityThree.svg",
+]
+
+var _rotation_sensitivity_icons: Array = [null, null, null]
+
 # 限向按钮的两个图标
 const ICON_LIMIT_OFF: String = "res://resources/UnLimitOrientation.svg"
 const ICON_LIMIT_ON: String = "res://resources/LimitOrientation.svg"
@@ -88,6 +104,7 @@ const MOUSE_POINTER_ID: int = -2
 @onready var right_stick_guide: TextureRect = $RightStickArea/RightStickGuide
 @onready var tilt_area: Panel = $TiltArea
 @onready var limit_orientation_button: Button = $LimitOrientationButton
+@onready var rotation_sensitivity_button: Button = $RotationSensitivityButton
 
 # 左右摇杆按钮
 @onready var left_stick_button: Panel = $LeftStickArea/LeftStickButton
@@ -223,6 +240,17 @@ func _ready() -> void:
 
 	_update_limit_orientation_icon()
 
+	# 旋转灵敏度按钮：三个图标 + 初始样式
+	for i in range(ICON_ROTATION_SENSITIVITY.size()):
+		if ResourceLoader.exists(ICON_ROTATION_SENSITIVITY[i]):
+			_rotation_sensitivity_icons[i] = load(ICON_ROTATION_SENSITIVITY[i])
+
+	if rotation_sensitivity_button != null:
+		rotation_sensitivity_button.focus_mode = Control.FOCUS_NONE
+		rotation_sensitivity_button.expand_icon = true
+
+	_update_rotation_sensitivity_icon()
+
 	# 初始化开关外观和节点可见状态
 	_update_toggle_visual(false)
 	_update_node_visibility()
@@ -264,6 +292,15 @@ func _input(event: InputEvent) -> void:
 			# 限向按钮
 			if _is_orientation_button_hit(touch.position):
 				_toggle_limit_orientation()
+				get_viewport().set_input_as_handled()
+				return
+
+			# 旋转灵敏度按钮（右摇杆正在运动时暂时不可用）
+			if (
+				right_stick_pointer_id == -1
+				and _is_rotation_sensitivity_hit(touch.position)
+			):
+				_cycle_rotation_sensitivity()
 				get_viewport().set_input_as_handled()
 				return
 
@@ -324,6 +361,15 @@ func _input(event: InputEvent) -> void:
 				# 限向按钮
 				if _is_orientation_button_hit(mouse.position):
 					_toggle_limit_orientation()
+					get_viewport().set_input_as_handled()
+					return
+
+				# 旋转灵敏度按钮（右摇杆正在运动时暂时不可用）
+				if (
+					right_stick_pointer_id == -1
+					and _is_rotation_sensitivity_hit(mouse.position)
+				):
+					_cycle_rotation_sensitivity()
 					get_viewport().set_input_as_handled()
 					return
 
@@ -802,8 +848,9 @@ func _send_stick_payload(left_vector: Vector2, right_vector: Vector2) -> void:
 			"ly": left_vector.y,
 			"rx": right_vector.x if RIGHT_STICK_ENABLED else 0.0,
 			"ry": right_vector.y if RIGHT_STICK_ENABLED else 0.0,
-			"speed_l": float(SPEED_TIER_MULTIPLIERS[_left_speed_tier]),
-			"speed_r": float(SPEED_TIER_MULTIPLIERS[_right_speed_tier]),
+			"yaw_scale": _rotation_sensitivity_scale(),
+			"speed_l": _move_scale() * float(SPEED_TIER_MULTIPLIERS[_left_speed_tier]),
+			"speed_r": _move_scale() * float(SPEED_TIER_MULTIPLIERS[_right_speed_tier]),
 			"dt": 1.0 / STICK_SEND_HZ,
 		}
 	)
@@ -1164,3 +1211,56 @@ func _update_orientation_borders() -> void:
 		right_area_style.border_width_top = int(right_widths.y)
 		right_area_style.border_width_right = int(right_widths.z)
 		right_area_style.border_width_bottom = int(right_widths.w)
+
+
+## addon_set 里的「移动倍数」（Options: move_speed，默认 1.0）。
+## ⚠️ 只乘到**平移**档位上；偏航旋转在 Blender 端用固定 RIG_YAW_RATE（不受档位/倍数影响）
+func _move_scale() -> float:
+	var options: Node = get_node_or_null("/root/Options")
+
+	if options == null or not options.has_method("get_float"):
+		return 1.0
+
+	return maxf(0.0, float(options.call("get_float", "move_speed")))
+
+
+# ============================================================
+# 旋转灵敏度按钮（目前只有 0/1/2 循环 + 图标切换）
+# ============================================================
+
+## 屏幕坐标是否落在旋转灵敏度按钮上
+func _is_rotation_sensitivity_hit(viewport_position: Vector2) -> bool:
+	if rotation_sensitivity_button == null or not rotation_sensitivity_button.visible:
+		return false
+
+	return rotation_sensitivity_button.get_global_rect().has_point(viewport_position)
+
+
+## 点击：ROTATION_SENSITIVITY = (ROTATION_SENSITIVITY + 1) % 3
+func _cycle_rotation_sensitivity() -> void:
+	ROTATION_SENSITIVITY = (ROTATION_SENSITIVITY + 1) % 3
+	_update_rotation_sensitivity_icon()
+
+	print("[Drone] ROTATION_SENSITIVITY =", ROTATION_SENSITIVITY)
+
+
+## 按当前档位设置图标
+func _update_rotation_sensitivity_icon() -> void:
+	if rotation_sensitivity_button == null:
+		return
+
+	var index: int = clampi(ROTATION_SENSITIVITY, 0, _rotation_sensitivity_icons.size() - 1)
+	var icon: Texture2D = _rotation_sensitivity_icons[index]
+
+	if icon != null:
+		rotation_sensitivity_button.icon = icon
+		rotation_sensitivity_button.text = ""
+	else:
+		rotation_sensitivity_button.text = str(index + 1)
+
+
+## 当前旋转灵敏度倍率（按 ROTATION_SENSITIVITY % 3 取档）
+func _rotation_sensitivity_scale() -> float:
+	var tier: int = ROTATION_SENSITIVITY % ROTATION_SENSITIVITY_MULTIPLIERS.size()
+
+	return float(ROTATION_SENSITIVITY_MULTIPLIERS[tier])
