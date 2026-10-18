@@ -13,7 +13,9 @@ const UNLINK_ICON: Texture2D = preload(
 )
 
 # 相机旋转基准的保存/恢复走 free 模式的 action（真正驱动相机旋转的就是那条流）
-const ROTATION_BASELINE_MODE: String = "free"
+# 需要收到「保存/恢复相机旋转基准」命令的 action 模式。
+# 原来只发给 "free"，导致 plane 模式 relink 时不会重新校准。
+const ROTATION_BASELINE_MODES: Array = ["free", "plane"]
 
 
 func _ready() -> void:
@@ -89,8 +91,9 @@ func _send_rotation_baseline_command(command: String) -> void:
 		)
 		return
 
-	connection.call(
-		"send_action",
-		ROTATION_BASELINE_MODE,
-		{"command": command}
-	)
+	for mode in ROTATION_BASELINE_MODES:
+		connection.call(
+			"send_action",
+			mode,
+			{"command": command}
+		)

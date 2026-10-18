@@ -100,6 +100,17 @@ func _ready() -> void:
 		false
 	)
 
+	# LinkButton 恢复发送时：把手机"当前姿态"当成新的零点重新校准，
+	# 配合 Blender 侧 relink 恢复的相机基准 → 暂停期间转过手机，恢复后相机不会跳。
+	if (
+		connection_node != null
+		and connection_node.has_signal("action_sending_changed")
+	):
+		connection_node.connect(
+			"action_sending_changed",
+			_on_action_sending_changed
+		)
+
 	if rotation_sender.is_available():
 		print("[Orientation] Plugin loaded")
 	else:
@@ -211,3 +222,14 @@ func _process(delta: float) -> void:
 			" Z=", snappedf(q.z, 0.01),
 			" W=", snappedf(q.w, 0.01)
 		)
+
+
+## LinkButton 恢复发送：重新校准手机姿态（当前姿态 = 新零点）
+func _on_action_sending_changed(enabled: bool) -> void:
+	if not enabled:
+		return   # 暂停：不用做任何事（Blender 那边已收到 unlink 并存好相机旋转）
+
+	if rotation_sender.calibrate():
+		print("[Orientation] Link 恢复：已重新校准手机姿态")
+	else:
+		push_warning("[Orientation] Link 恢复：手机姿态重新校准失败（暂无数据？）")
