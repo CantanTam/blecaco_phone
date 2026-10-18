@@ -76,6 +76,30 @@ shadow_color = Color(0, 0, 0, 0.627451)
 shadow_size = 3
 shadow_offset = Vector2(0, 1)
 
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_wr66y"]
+bg_color = Color(0, 0, 0, 0.627451)
+corner_radius_top_left = 60
+corner_radius_top_right = 60
+corner_radius_bottom_right = 60
+corner_radius_bottom_left = 60
+corner_detail = 20
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_v3fqs"]
+bg_color = Color(0, 0, 0, 0.627451)
+corner_radius_top_left = 60
+corner_radius_top_right = 60
+corner_radius_bottom_right = 60
+corner_radius_bottom_left = 60
+corner_detail = 20
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_6psps"]
+bg_color = Color(0, 0, 0, 0.627451)
+corner_radius_top_left = 60
+corner_radius_top_right = 60
+corner_radius_bottom_right = 60
+corner_radius_bottom_left = 60
+corner_detail = 20
+
 [node name="DroneMode" type="Control" unique_id=311837689]
 layout_mode = 3
 anchors_preset = 15
@@ -98,6 +122,7 @@ grow_vertical = 0
 theme_override_styles/panel = SubResource("StyleBoxFlat_gsaqu")
 
 [node name="LeftStickGuide" type="TextureRect" parent="LeftStickArea" unique_id=835047911]
+visible = false
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -166,7 +191,7 @@ anchor_right = 1.0
 offset_left = -100.0
 offset_top = 200.0
 offset_right = -40.0
-offset_bottom = 300.0
+offset_bottom = 300.0001
 grow_horizontal = 0
 theme_override_styles/panel = SubResource("StyleBoxFlat_a6nh6")
 
@@ -196,3 +221,13 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 texture = ExtResource("3_2a3o2")
+
+[node name="LimitOrientationButton" type="Button" parent="." unique_id=2116037143]
+layout_mode = 1
+offset_left = 40.0
+offset_top = 200.0
+offset_right = 160.0
+offset_bottom = 320.0
+theme_override_styles/normal = SubResource("StyleBoxFlat_wr66y")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_v3fqs")
+theme_override_styles/hover = SubResource("StyleBoxFlat_6psps")

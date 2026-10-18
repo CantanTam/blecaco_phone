@@ -35,6 +35,20 @@ const SPEED_TIER_THRESHOLDS: Array = [15.0, 85.0, 155.0]
 # 迟滞（px）：避免在阈值附近来回跳档
 const SPEED_TIER_HYSTERESIS: float = 8.0
 
+# ── 方向限位时的边框宽度指示 ──
+const ORIENTATION_BORDER_THICK: int = 50   # 限定方向那一侧
+const ORIENTATION_BORDER_DEFAULT: int = 15 # 其它情况（与 .tscn 默认一致）
+
+# ── 方向限位（LIMIT_ORIENTATION）──
+# 手指到 X 轴 / Y 轴距离"相等"的容差（px）：落在这个带内 → 动作全部暂停
+const ORIENTATION_LIMIT_EPSILON: float = 6.0
+
+# ── 摇杆低通滤波（抗手指抖动）──
+# 时间常数（秒）：越大越平滑、越"肉"；0.045 ≈ 60Hz 下 α≈0.30，延迟约 2~3 帧
+const STICK_SMOOTH_TAU: float = 0.045
+# 是否启用（关掉就是原始直通）
+const STICK_SMOOTH_ENABLED: bool = true
+
 # 摇杆数据的发送频率（Hz）
 const STICK_SEND_HZ: float = 30.0
 # 初始化消息的重试间隔（秒）
@@ -45,6 +59,16 @@ const STICK_CANCEL_RADIUS: float = 400.0
 
 # 圆范围B：摇杆按钮圆心的移动上限（以 StickArea 中心为圆心）
 const STICK_LIMIT_RADIUS: float = 225.0
+
+# 限向（暂时只做样式，不做真实功能）
+var LIMIT_ORIENTATION: bool = false
+
+# 限向按钮的两个图标
+const ICON_LIMIT_OFF: String = "res://resources/UnLimitOrientation.svg"
+const ICON_LIMIT_ON: String = "res://resources/LimitOrientation.svg"
+
+var _icon_limit_off: Texture2D = null
+var _icon_limit_on: Texture2D = null
 
 # ── 调试：把这个改成 false 就不再刷日志 ──
 const DEBUG_INPUT: bool = true
@@ -63,6 +87,7 @@ const MOUSE_POINTER_ID: int = -2
 @onready var left_stick_guide: TextureRect = $LeftStickArea/LeftStickGuide
 @onready var right_stick_guide: TextureRect = $RightStickArea/RightStickGuide
 @onready var tilt_area: Panel = $TiltArea
+@onready var limit_orientation_button: Button = $LimitOrientationButton
 
 # 左右摇杆按钮
 @onready var left_stick_button: Panel = $LeftStickArea/LeftStickButton
@@ -118,6 +143,14 @@ var _tilt_cooldown: float = 0.0
 # 当前速度档位（默认 2 = 黄档 = 1.0×）
 var _left_speed_tier: int = 2
 var _right_speed_tier: int = 2
+
+# 上一次应用的边框宽度（left/top/right/bottom），用于避免重复写主题
+var _left_border_widths: Vector4 = Vector4(-1, -1, -1, -1)
+var _right_border_widths: Vector4 = Vector4(-1, -1, -1, -1)
+
+# 低通滤波后的摇杆向量（实际发送用这个）
+var _left_vector_smooth: Vector2 = Vector2.ZERO
+var _right_vector_smooth: Vector2 = Vector2.ZERO
 
 # 左右 StickArea 样式的副本（只改边框颜色，不影响场景里的共享资源）
 var left_area_style: StyleBoxFlat = null
@@ -177,6 +210,19 @@ func _ready() -> void:
 	left_stick_button.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	right_stick_button.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
+	# 限向按钮：图标 + 初始样式
+	if ResourceLoader.exists(ICON_LIMIT_OFF):
+		_icon_limit_off = load(ICON_LIMIT_OFF)
+
+	if ResourceLoader.exists(ICON_LIMIT_ON):
+		_icon_limit_on = load(ICON_LIMIT_ON)
+
+	if limit_orientation_button != null:
+		limit_orientation_button.focus_mode = Control.FOCUS_NONE
+		limit_orientation_button.expand_icon = true
+
+	_update_limit_orientation_icon()
+
 	# 初始化开关外观和节点可见状态
 	_update_toggle_visual(false)
 	_update_node_visibility()
@@ -212,6 +258,12 @@ func _input(event: InputEvent) -> void:
 			# 优先处理开关
 			if _is_position_inside(toggle_area, touch.position):
 				_toggle_drone_status()
+				get_viewport().set_input_as_handled()
+				return
+
+			# 限向按钮
+			if _is_orientation_button_hit(touch.position):
+				_toggle_limit_orientation()
 				get_viewport().set_input_as_handled()
 				return
 
@@ -266,6 +318,12 @@ func _input(event: InputEvent) -> void:
 				# 优先处理开关
 				if _is_position_inside(toggle_area, mouse.position):
 					_toggle_drone_status()
+					get_viewport().set_input_as_handled()
+					return
+
+				# 限向按钮
+				if _is_orientation_button_hit(mouse.position):
+					_toggle_limit_orientation()
 					get_viewport().set_input_as_handled()
 					return
 
@@ -423,8 +481,10 @@ func _process(_delta: float) -> void:
 		_apply_stick_position(false)
 
 	_update_area_border()
+	_update_orientation_borders()
 	_update_speed_tiers()
 	_update_stick_vectors()
+	_update_smoothed_vectors(_delta)
 	_send_sticks(_delta)
 	_update_tilt(_delta)
 
@@ -465,6 +525,7 @@ func _end_stick(pointer_id: int) -> void:
 	# 左摇杆松开：回到中心
 	if left_stick_pointer_id == pointer_id:
 		left_stick_pointer_id = -1
+		_left_vector_smooth = Vector2.ZERO
 
 		_set_button_offsets(
 			left_stick_button,
@@ -475,6 +536,7 @@ func _end_stick(pointer_id: int) -> void:
 	# 右摇杆松开：回到中心
 	if right_stick_pointer_id == pointer_id:
 		right_stick_pointer_id = -1
+		_right_vector_smooth = Vector2.ZERO
 
 		_set_button_offsets(
 			right_stick_button,
@@ -725,7 +787,7 @@ func _send_sticks(delta: float) -> void:
 		return
 
 	_send_timer = 0.0
-	_send_stick_payload(left_stick_vector, right_stick_vector)
+	_send_stick_payload(_left_vector_smooth, _right_vector_smooth)
 	_drone_was_sending = true
 
 
@@ -914,3 +976,191 @@ func _next_speed_tier(distance: float, current: int) -> int:
 		tier -= 1
 
 	return tier
+
+
+## 摇杆向量低通滤波：抑制手指抖动（松手时已在 _end_stick 里立刻清零）
+func _update_smoothed_vectors(delta: float) -> void:
+	if not STICK_SMOOTH_ENABLED:
+		_left_vector_smooth = _apply_orientation_limit(
+			left_stick_vector, left_stick_area, left_stick_pointer_id,
+			_left_speed_tier, true
+		)
+		_right_vector_smooth = _apply_orientation_limit(
+			right_stick_vector, right_stick_area, right_stick_pointer_id,
+			_right_speed_tier, false
+		)
+		return
+
+	# 与帧率无关的指数平滑：k = 1 - e^(-dt/τ)
+	var k: float = 1.0 - exp(-maxf(delta, 1e-4) / STICK_SMOOTH_TAU)
+
+	# 先做方向限位（锁定在单一轴），再平滑 —— 切换轴时会有短暂过渡，不会突变
+	var left_target: Vector2 = _apply_orientation_limit(
+		left_stick_vector,
+		left_stick_area,
+		left_stick_pointer_id,
+		_left_speed_tier,
+		true
+	)
+	var right_target: Vector2 = _apply_orientation_limit(
+		right_stick_vector,
+		right_stick_area,
+		right_stick_pointer_id,
+		_right_speed_tier,
+		false
+	)
+
+	_left_vector_smooth = _left_vector_smooth.lerp(left_target, k)
+	_right_vector_smooth = _right_vector_smooth.lerp(right_target, k)
+
+	# 已经贴到目标就吸附过去，避免无限逼近
+	if (_left_vector_smooth - left_target).length() < 1e-4:
+		_left_vector_smooth = left_target
+
+	if (_right_vector_smooth - right_target).length() < 1e-4:
+		_right_vector_smooth = right_target
+
+
+# ============================================================
+# 限向按钮（暂时只有样式切换）
+# ============================================================
+
+## 屏幕坐标是否落在限向按钮上
+func _is_orientation_button_hit(viewport_position: Vector2) -> bool:
+	if limit_orientation_button == null or not limit_orientation_button.visible:
+		return false
+
+	return limit_orientation_button.get_global_rect().has_point(viewport_position)
+
+
+## 点击限向按钮：切换状态 + 换图标
+func _toggle_limit_orientation() -> void:
+	LIMIT_ORIENTATION = not LIMIT_ORIENTATION
+	_update_limit_orientation_icon()
+
+	print("[Drone] LIMIT_ORIENTATION =", LIMIT_ORIENTATION)
+
+
+## 按当前状态设置按钮图标
+func _update_limit_orientation_icon() -> void:
+	if limit_orientation_button == null:
+		return
+
+	var icon: Texture2D = _icon_limit_on if LIMIT_ORIENTATION else _icon_limit_off
+
+	if icon != null:
+		limit_orientation_button.icon = icon
+		limit_orientation_button.text = ""
+	else:
+		# 图标缺失时退化为文字，不影响使用
+		limit_orientation_button.text = "ON" if LIMIT_ORIENTATION else "OFF"
+
+
+## 方向限位：把摇杆向量锁到单一轴上
+##   手指离 X 轴更近（偏水平）→ 只保留水平分量（左=旋转 / 右=横移）
+##   手指离 Y 轴更近（偏竖直）→ 只保留竖直分量（左=升降 / 右=纵移）
+##   到两轴距离相等（容差内）→ 全部为 0
+func _apply_orientation_limit(
+	raw: Vector2,
+	area: Control,
+	pointer_id: int,
+	tier: int,
+	is_left: bool
+) -> Vector2:
+	if not LIMIT_ORIENTATION:
+		return raw
+
+	# 摇杆没被按住（或还在白档 = 未开始移动）→ 不做限位
+	if pointer_id == -1 or tier < 1:
+		return raw
+
+	var latest: Vector2 = (
+		left_stick_latest_position if is_left else right_stick_latest_position
+	)
+	var local_position: Vector2 = _viewport_to_local(area, latest)
+	var offset: Vector2 = local_position - (area.size * 0.5)
+
+	# 到 X 轴（水平轴）的距离 = |offset.y|；到 Y 轴（竖直轴）的距离 = |offset.x|
+	var distance_to_x: float = absf(offset.y)
+	var distance_to_y: float = absf(offset.x)
+
+	# 相等（容差内）→ 旋转与移动都暂停
+	if absf(distance_to_x - distance_to_y) <= ORIENTATION_LIMIT_EPSILON:
+		return Vector2.ZERO
+
+	# 离 X 轴更近 → 偏水平 → 只执行水平动作
+	if distance_to_x < distance_to_y:
+		return Vector2(raw.x, 0.0)
+
+	# 离 Y 轴更近 → 偏竖直 → 只执行竖直动作
+	return Vector2(0.0, raw.y)
+
+
+# ============================================================
+# 方向限位的边框宽度指示（左右各一份）
+# ============================================================
+
+## 根据当前限位方向计算边框宽度 (left, top, right, bottom)
+func _orientation_border_widths(is_left: bool) -> Vector4:
+	var default_widths := Vector4(
+		ORIENTATION_BORDER_DEFAULT, ORIENTATION_BORDER_DEFAULT,
+		ORIENTATION_BORDER_DEFAULT, ORIENTATION_BORDER_DEFAULT
+	)
+
+	if not LIMIT_ORIENTATION:
+		return default_widths
+
+	var pointer_id: int = left_stick_pointer_id if is_left else right_stick_pointer_id
+	var tier: int = _left_speed_tier if is_left else _right_speed_tier
+
+	# 没在拖动 / 白档（未开始移动）→ 保持默认
+	if pointer_id == -1 or tier < 1:
+		return default_widths
+
+	var area: Control = left_stick_area if is_left else right_stick_area
+	var latest: Vector2 = (
+		left_stick_latest_position if is_left else right_stick_latest_position
+	)
+
+	var local_position: Vector2 = _viewport_to_local(area, latest)
+	var offset: Vector2 = local_position - (area.size * 0.5)
+
+	var distance_to_x: float = absf(offset.y)
+	var distance_to_y: float = absf(offset.x)
+
+	# 相等（容差内）→ 默认（四边 15）
+	if absf(distance_to_x - distance_to_y) <= ORIENTATION_LIMIT_EPSILON:
+		return default_widths
+
+	# 偏水平 → 只标左 / 右
+	if distance_to_x < distance_to_y:
+		if offset.x < 0.0:
+			return Vector4(ORIENTATION_BORDER_THICK, 0, 0, 0)
+
+		return Vector4(0, 0, ORIENTATION_BORDER_THICK, 0)
+
+	# 偏竖直 → 只标上 / 下
+	if offset.y < 0.0:
+		return Vector4(0, ORIENTATION_BORDER_THICK, 0, 0)
+
+	return Vector4(0, 0, 0, ORIENTATION_BORDER_THICK)
+
+
+## 把宽度写到两侧 StickArea 的样式上（变化时才写）
+func _update_orientation_borders() -> void:
+	var left_widths: Vector4 = _orientation_border_widths(true)
+	var right_widths: Vector4 = _orientation_border_widths(false)
+
+	if left_area_style != null and left_widths != _left_border_widths:
+		_left_border_widths = left_widths
+		left_area_style.border_width_left = int(left_widths.x)
+		left_area_style.border_width_top = int(left_widths.y)
+		left_area_style.border_width_right = int(left_widths.z)
+		left_area_style.border_width_bottom = int(left_widths.w)
+
+	if right_area_style != null and right_widths != _right_border_widths:
+		_right_border_widths = right_widths
+		right_area_style.border_width_left = int(right_widths.x)
+		right_area_style.border_width_top = int(right_widths.y)
+		right_area_style.border_width_right = int(right_widths.z)
+		right_area_style.border_width_bottom = int(right_widths.w)
