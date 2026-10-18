@@ -15,6 +15,29 @@ extends Node
 #   让 Blender 在一次更新中同时获得姿态和前进数据。
 # ============================================================
 
+# ============================================================
+# 推流画面动态旋转（仅 Car Mode）
+#   旋转手机时，画面反向旋转 → 屏幕里的画面不跟着转。
+#   参考：h_notice_bar.gd 用 Input.get_gravity() 判定手机倾角。
+# ============================================================
+const STREAM_ROLL_ENABLED: bool = true
+# 反向旋转的方向（真机若反了，把它改成 -1.0）
+const STREAM_ROLL_SIGN: float = -1.0
+# 补偿系数。
+# ⚠️ Blender 端 car 相机已经**去掉横滚**（地平线永远水平），
+#    所以屏幕窗口只需要补**手机自身的横滚** → 系数 = 1.0（满量）
+const STREAM_ROLL_GAIN: float = 1.0
+# 轻微平滑，避免画面随手指/传感器抖动
+const STREAM_ROLL_SMOOTH_TAU: float = 0.08
+# 调试：每秒打印一次重力与角度
+const STREAM_ROLL_DEBUG: bool = false
+
+var stream_window: Control = null
+var _stream_roll: float = 0.0
+var _stream_debug_timer: float = 0.0
+# 测试用：非零时替代 Input.get_gravity()
+var _gravity_override: Vector3 = Vector3.ZERO
+
 const INITIALIZE_RETRY_INTERVAL: float = 0.25
 
 # 发送频率自适应 Blender 的输出帧率。
@@ -99,6 +122,16 @@ var car_mode_initialized: bool = false
 
 
 func _ready() -> void:
+	# 找推流画面节点（stream.tscn 里的 StreamWindow，全屏铺满）
+	stream_window = get_tree().root.find_child(
+		"StreamWindow",
+		true,
+		false
+	) as Control
+
+	if stream_window == null:
+		push_warning("[CarMode] 找不到 StreamWindow，画面旋转不可用")
+
 	# 查找常驻的 Connection 节点。
 	connection_node = get_tree().root.find_child(
 		"Connection",
@@ -124,6 +157,9 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	# 画面动态旋转：放在所有提前 return 之前，独立于网络/姿态数据
+	_update_stream_rotation(delta)
+
 	if not rotation_sender.has_orientation_data():
 		return
 
@@ -226,3 +262,58 @@ func _process(delta: float) -> void:
 			" Z=", snappedf(q.z, 0.01),
 			" W=", snappedf(q.w, 0.01)
 		)
+
+
+## 取重力（测试时可注入）
+func _get_gravity() -> Vector3:
+	if _gravity_override.length() > 0.01:
+		return _gravity_override
+
+	return Input.get_gravity()
+
+
+## 根据手机横向倾斜角 θ，把推流画面反向旋转 -θ
+func _update_stream_rotation(delta: float) -> void:
+	if not STREAM_ROLL_ENABLED:
+		return
+
+	if stream_window == null or not is_instance_valid(stream_window):
+		return
+
+	var gravity: Vector3 = _get_gravity()
+
+	if gravity.length() < 0.1:
+		return
+
+	# 屏幕平面内的重力方向 → 手机横滚角 θ
+	#   atan2(g.x, -g.y)：竖直握持时 θ = 0
+	var roll: float = atan2(gravity.x, -gravity.y)
+
+	# 平滑（与帧率无关的指数平滑）
+	var k: float = 1.0 - exp(-maxf(delta, 1e-4) / STREAM_ROLL_SMOOTH_TAU)
+	_stream_roll = lerp_angle(_stream_roll, roll, k)
+
+	# 绕自身中心旋转（不缩放）
+	stream_window.pivot_offset = stream_window.size * 0.5
+	stream_window.rotation = _stream_roll * STREAM_ROLL_SIGN * STREAM_ROLL_GAIN
+
+	if STREAM_ROLL_DEBUG:
+		_stream_debug_timer += delta
+
+		if _stream_debug_timer >= 1.0:
+			_stream_debug_timer = 0.0
+			print(
+				"[CarMode] gravity=%s  θ=%.1f°  增益=%.2f  画面旋转=%.1f°"
+				% [
+					str(gravity),
+					rad_to_deg(roll),
+					STREAM_ROLL_GAIN,
+					rad_to_deg(stream_window.rotation)
+				]
+			)
+
+
+## 离开 Car Mode：把推流画面转回 0，避免影响其它模式
+func _exit_tree() -> void:
+	if stream_window != null and is_instance_valid(stream_window):
+		stream_window.rotation = 0.0
