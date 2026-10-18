@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="120"
+   height="120"
+   viewBox="0 0 31.749999 31.75"
+   version="1.1"
+   id="svg1"
+   inkscape:version="1.4.4 (dcaf3e7d9e, 2026-05-05)"
+   sodipodi:docname="UnZoom.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#ffffff"
+     bordercolor="#999999"
+     borderopacity="1"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0"
+     inkscape:pagecheckerboard="true"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="px"
+     inkscape:zoom="5.8205364"
+     inkscape:cx="73.189131"
+     inkscape:cy="32.728942"
+     inkscape:window-width="2560"
+     inkscape:window-height="1354"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg1" />
+  <defs
+     id="defs1" />
+  <path
+     id="rect2"
+     style="baseline-shift:baseline;display:inline;overflow:visible;opacity:0.3;vector-effect:none;fill:#ffffff;paint-order:markers fill stroke;enable-background:accumulate;stop-color:#000000"
+     d="m 6.372996,9.452136 v 5.282882 h 2.500105 v -2.782776 h 2.783293 V 9.452136 Z m 13.720609,0 v 2.500106 h 2.783293 v 2.782776 h 2.500105 V 9.452136 Z M 6.372996,17.014465 v 5.283399 h 5.283398 V 19.797758 H 8.873101 v -2.783293 z m 16.503902,0 v 2.783293 h -2.783293 v 2.500106 h 5.283398 v -5.283399 z"
+     inkscape:label="UnZoom" />
+</svg>

@@ -58,6 +58,23 @@ const SPEED_RAMP_PER_SECOND: float = 18.0
 # 正常使用时保持 false，避免大量日志影响调试。
 const VERBOSE_ORIENTATION_LOG := false
 
+# ── ZoomFit 按钮（缩放适配开关，目前只做样式）──
+var ZOOM_FIT: bool = false
+
+const ICON_ZOOM_OFF: String = "res://resources/UnZoom.svg"
+const ICON_ZOOM_ON: String = "res://resources/Zoom.svg"
+
+var _icon_zoom_off: Texture2D = null
+var _icon_zoom_on: Texture2D = null
+
+# ZoomFit 缩放过渡动画时长（秒）
+const ZOOM_FIT_TWEEN_TIME: float = 0.28
+
+var _zoom_tween: Tween = null
+
+# 触摸平台标志（真机上触摸会同时产生模拟鼠标事件，需要忽略鼠标避免双触发）
+var _touch_platform: bool = false
+
 var rotation_sender = preload(
 	"res://scripts/getrotation.gd"
 ).new()
@@ -73,6 +90,7 @@ var connection_node: Node = null
 
 # 读取 CarForwardArea 的 forward_speed。
 # 使用 Node 类型，避免依赖 Godot 的全局脚本类缓存。
+@onready var zoom_fit_button: Button = $ZoomFit
 @onready var forward_area: Node = (
 	get_node_or_null("CarForwardArea")
 )
@@ -123,6 +141,24 @@ var car_mode_initialized: bool = false
 
 func _ready() -> void:
 	# 找推流画面节点（stream.tscn 里的 StreamWindow，全屏铺满）
+	# ZoomFit 按钮：两个图标 + 初始样式
+	if ResourceLoader.exists(ICON_ZOOM_OFF):
+		_icon_zoom_off = load(ICON_ZOOM_OFF)
+
+	if ResourceLoader.exists(ICON_ZOOM_ON):
+		_icon_zoom_on = load(ICON_ZOOM_ON)
+
+	_touch_platform = (
+		DisplayServer.is_touchscreen_available()
+		or OS.has_feature("mobile")
+	)
+
+	if zoom_fit_button != null:
+		zoom_fit_button.focus_mode = Control.FOCUS_NONE
+		zoom_fit_button.expand_icon = true
+
+	_update_zoom_fit_icon()
+
 	stream_window = get_tree().root.find_child(
 		"StreamWindow",
 		true,
@@ -315,5 +351,106 @@ func _update_stream_rotation(delta: float) -> void:
 
 ## 离开 Car Mode：把推流画面转回 0，避免影响其它模式
 func _exit_tree() -> void:
+	if _zoom_tween != null and _zoom_tween.is_valid():
+		_zoom_tween.kill()
+
 	if stream_window != null and is_instance_valid(stream_window):
 		stream_window.rotation = 0.0
+		stream_window.scale = Vector2.ONE
+
+
+# ============================================================
+# ZoomFit 按钮（缩放适配开关，目前只有样式切换）
+# ============================================================
+
+## 屏幕坐标是否落在 ZoomFit 按钮上
+func _is_zoom_fit_hit(viewport_position: Vector2) -> bool:
+	if zoom_fit_button == null or not zoom_fit_button.visible:
+		return false
+
+	return zoom_fit_button.get_global_rect().has_point(viewport_position)
+
+
+## 触摸/鼠标输入：命中 ZoomFit 就切换（用矩形命中，不用 Button.pressed）
+func _input(event: InputEvent) -> void:
+	if event is InputEventScreenTouch:
+		if event.pressed and _is_zoom_fit_hit(event.position):
+			_toggle_zoom_fit()
+			get_viewport().set_input_as_handled()
+
+		return
+
+	if event is InputEventMouseButton:
+		# 真机上触摸会产生模拟鼠标事件 → 必须忽略，否则会切两次
+		if _touch_platform:
+			return
+
+		if (
+			event.pressed
+			and event.button_index == MOUSE_BUTTON_LEFT
+			and _is_zoom_fit_hit(event.position)
+		):
+			_toggle_zoom_fit()
+			get_viewport().set_input_as_handled()
+
+
+## 点击：ZOOM_FIT = !ZOOM_FIT
+func _toggle_zoom_fit() -> void:
+	ZOOM_FIT = not ZOOM_FIT
+	_update_zoom_fit_icon()
+	_apply_zoom_fit()
+
+	print("[CarMode] ZOOM_FIT =", ZOOM_FIT)
+
+
+## 按当前状态设置图标
+func _update_zoom_fit_icon() -> void:
+	if zoom_fit_button == null:
+		return
+
+	var icon: Texture2D = _icon_zoom_on if ZOOM_FIT else _icon_zoom_off
+
+	if icon != null:
+		zoom_fit_button.icon = icon
+		zoom_fit_button.text = ""
+	else:
+		zoom_fit_button.text = "ON" if ZOOM_FIT else "OFF"
+
+
+## ZoomFit 的缩放目标：
+##   ZOOM_FIT = true  → 让"画面的高"等于"屏幕的宽"（scale = 屏幕宽 / 屏幕高）
+##                      → 放大裁切，旋转时屏幕里不会露出推流背景
+##   ZOOM_FIT = false → 复原成 1:1
+func _zoom_fit_target_scale() -> Vector2:
+	if stream_window == null or not is_instance_valid(stream_window):
+		return Vector2.ONE
+
+	if not ZOOM_FIT:
+		return Vector2.ONE
+
+	var screen_width: float = stream_window.size.x
+	var screen_height: float = maxf(stream_window.size.y, 1.0)
+
+	# 画面高（= 屏幕高）→ 变成屏幕宽
+	var factor: float = screen_width / screen_height
+
+	return Vector2(factor, factor)
+
+
+## 带过渡动画地应用缩放（绕画面中心，因为 pivot_offset 已在旋转里设为中心）
+func _apply_zoom_fit() -> void:
+	if stream_window == null or not is_instance_valid(stream_window):
+		return
+
+	if _zoom_tween != null and _zoom_tween.is_valid():
+		_zoom_tween.kill()
+
+	_zoom_tween = create_tween()
+	_zoom_tween.set_trans(Tween.TRANS_SINE)
+	_zoom_tween.set_ease(Tween.EASE_IN_OUT)
+	_zoom_tween.tween_property(
+		stream_window,
+		"scale",
+		_zoom_fit_target_scale(),
+		ZOOM_FIT_TWEEN_TIME
+	)

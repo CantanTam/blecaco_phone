@@ -19,6 +19,30 @@ shader_parameter/mask_texture = ExtResource("3_texture")
 shader_parameter/node_size = Vector2(1, 1)
 shader_parameter/circle_center = Vector2(0, 0)
 
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_qnk50"]
+bg_color = Color(0, 0, 0, 0.627451)
+corner_radius_top_left = 60
+corner_radius_top_right = 60
+corner_radius_bottom_right = 60
+corner_radius_bottom_left = 60
+corner_detail = 20
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_sec1p"]
+bg_color = Color(0, 0, 0, 0.627451)
+corner_radius_top_left = 60
+corner_radius_top_right = 60
+corner_radius_bottom_right = 60
+corner_radius_bottom_left = 60
+corner_detail = 20
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_a6nh6"]
+bg_color = Color(0, 0, 0, 0.627451)
+corner_radius_top_left = 120
+corner_radius_top_right = 120
+corner_radius_bottom_right = 120
+corner_radius_bottom_left = 120
+corner_detail = 20
+
 [node name="CarMode" type="Control" unique_id=311837689]
 layout_mode = 3
 anchors_preset = 15
@@ -76,3 +100,13 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 texture = ExtResource("3_texture")
+
+[node name="ZoomFit" type="Button" parent="." unique_id=521083619]
+layout_mode = 1
+offset_left = 40.0
+offset_top = 220.0
+offset_right = 160.0
+offset_bottom = 340.0
+theme_override_styles/normal = SubResource("StyleBoxFlat_qnk50")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_sec1p")
+theme_override_styles/hover = SubResource("StyleBoxFlat_a6nh6")
