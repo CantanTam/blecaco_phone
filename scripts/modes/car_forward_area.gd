@@ -45,6 +45,27 @@ const Y_YELLOW_TO_RED := 710.0
 #   负数 = 后退，沿车辆局部 +Z 方向移动
 #
 # 最终位移倍率还会乘以 Options 中的 car/car_speed。
+# ── 连续油门（真车化，默认开启）──
+# 手指 y 距底部：
+#   0    ~ 370   → 倒车：0 在 370，越往下越快，最低 -REV_MAX
+#   370  ~ 430   → 空档死区（滑行不加速）
+#   430  ~ 610   → 前进：0 → +FWD_MAX
+#   610 以上     → 满油门平台（FWD_MAX）
+const THROTTLE_CONTINUOUS := true
+const THROTTLE_FWD_MAX: float = 9.0
+
+# ── 油门锁定（防手指滑移）──
+# 手指在某个位置静止一小会儿后，自动锁定当前速度；
+# 只有明显移动（超过 THROTTLE_LATCH_BREAK_PX）才解锁重新跟手。
+const THROTTLE_LATCH_ENABLED: bool = true
+const THROTTLE_LATCH_STILL_TIME: float = 0.30
+const THROTTLE_LATCH_BREAK_PX: float = 12.0     # 前进最高档（×）
+const THROTTLE_REV_MAX: float = 3.0     # 倒车最高档（×）
+const THROTTLE_REVERSE_TOP: float = 370.0   # 倒车区上边界（此处速度 = 0）
+const THROTTLE_NEUTRAL_TOP: float = 430.0   # 空档区上边界
+const THROTTLE_FULL_Y: float = 610.0        # 满油门位置
+
+# ── 分档模式（THROTTLE_CONTINUOUS = false 时使用）──
 const SPEED_Y_LIMITS := [170.0, 370.0, 515.0, 610.0]
 const SPEED_VALUES := [-4.0, -2.0, 1.0, 3.0, 9.0]
 
@@ -63,6 +84,14 @@ var _base_idle_alpha: float = 0.0
 
 # 记录所有正在触屏的手指及其当前位置（视口坐标）。
 var active_touches: Dictionary = {}
+
+# 油门锁定状态
+var _latch_active: bool = false
+var _latch_speed: float = 0.0
+var _latch_y_from_bottom: float = 0.0
+var _still_time: float = 0.0
+var _last_y_from_bottom: float = -1.0
+var _current_y_from_bottom: float = -1.0
 
 # 电脑鼠标测试状态。
 var mouse_pressed: bool = false
@@ -219,13 +248,23 @@ func _update_feedback() -> void:
 	# 以区域底边为 y = 0，向上为正。
 	var y_from_bottom: float = size.y - local_position.y
 
+	_current_y_from_bottom = y_from_bottom if is_inside else -1.0
+
 	# 根据手指高度计算车辆前进/后退倍率。
 	# 未按在区域内或暂停时，速度为 0。
-	forward_speed = (
-		_speed_for_y(y_from_bottom)
-		if is_inside
-		else 0.0
-	)
+	if not is_inside:
+		_reset_latch()
+		forward_speed = 0.0
+	elif _latch_active:
+		# 锁定中：只有明显移动才解锁，避免手指滑移改速度
+		if absf(y_from_bottom - _latch_y_from_bottom) > THROTTLE_LATCH_BREAK_PX:
+			_latch_active = false
+			_still_time = 0.0
+			forward_speed = _speed_for_y(y_from_bottom)
+		else:
+			forward_speed = _latch_speed
+	else:
+		forward_speed = _speed_for_y(y_from_bottom)
 
 	# 箭头底色：按下时变实心。
 	bottom_color.color.a = (
@@ -294,11 +333,44 @@ func _color_for_y(y_from_bottom: float) -> Color:
 #
 # 正数表示前进，负数表示后退。
 func _speed_for_y(y_from_bottom: float) -> float:
+	if THROTTLE_CONTINUOUS:
+		return _continuous_speed_for_y(y_from_bottom)
+
 	for i in SPEED_Y_LIMITS.size():
 		if y_from_bottom <= SPEED_Y_LIMITS[i]:
 			return SPEED_VALUES[i]
 
 	return SPEED_VALUES[SPEED_VALUES.size() - 1]
+
+
+## 连续油门：像真车踏板一样，越推越快
+func _continuous_speed_for_y(y_from_bottom: float) -> float:
+	# 倒车区：370 → 0，越往下越快
+	if y_from_bottom <= THROTTLE_REVERSE_TOP:
+		var t: float = 1.0 - clampf(
+			y_from_bottom / maxf(THROTTLE_REVERSE_TOP, 1.0),
+			0.0,
+			1.0
+		)
+
+		return -THROTTLE_REV_MAX * t
+
+	# 空档死区：滑行不加速
+	if y_from_bottom <= THROTTLE_NEUTRAL_TOP:
+		return 0.0
+
+	# 前进区：430 → 610，线性到满油门；以上是满油门平台
+	var forward_span: float = maxf(
+		THROTTLE_FULL_Y - THROTTLE_NEUTRAL_TOP,
+		1.0
+	)
+	var t: float = clampf(
+		(y_from_bottom - THROTTLE_NEUTRAL_TOP) / forward_span,
+		0.0,
+		1.0
+	)
+
+	return THROTTLE_FWD_MAX * t
 
 
 # 节点尺寸变化时同步给 shader。
@@ -314,3 +386,49 @@ func _update_glow_size() -> void:
 
 func _is_inside(point: Vector2) -> bool:
 	return get_global_rect().has_point(point)
+
+
+# ============================================================
+# 油门锁定：手指静止 → 锁定速度；明显移动 → 解锁
+# ============================================================
+
+func _process(delta: float) -> void:
+	if not THROTTLE_LATCH_ENABLED:
+		return
+
+	if _latch_active:
+		return
+
+	if _current_y_from_bottom < 0.0:
+		_still_time = 0.0
+		_last_y_from_bottom = -1.0
+		return
+
+	# 手指几乎没动 → 累计静止时间
+	if (
+		_last_y_from_bottom >= 0.0
+		and absf(_current_y_from_bottom - _last_y_from_bottom) <= 1.0
+	):
+		_still_time += delta
+
+		if (
+			_still_time >= THROTTLE_LATCH_STILL_TIME
+			and not is_zero_approx(forward_speed)
+		):
+			_latch_active = true
+			_latch_speed = forward_speed
+			_latch_y_from_bottom = _current_y_from_bottom
+			_still_time = 0.0
+	else:
+		_still_time = 0.0
+
+	_last_y_from_bottom = _current_y_from_bottom
+
+
+## 清空锁定（松手 / 离开区域时调用）
+func _reset_latch() -> void:
+	_latch_active = false
+	_latch_speed = 0.0
+	_latch_y_from_bottom = 0.0
+	_still_time = 0.0
+	_last_y_from_bottom = -1.0

@@ -16,47 +16,69 @@ extends Node
 # ============================================================
 
 # ============================================================
-# 推流画面动态旋转（仅 Car Mode）
-#   旋转手机时，画面反向旋转 → 屏幕里的画面不跟着转。
-#   参考：h_notice_bar.gd 用 Input.get_gravity() 判定手机倾角。
+# ⚙️ Car Mode 全部可调参数（集中在这里改）
 # ============================================================
+
+# ── 推流画面：动态反向旋转（旋转手机 → 画面不跟着转）──
 const STREAM_ROLL_ENABLED: bool = true
-# 反向旋转的方向（真机若反了，把它改成 -1.0）
+# 反向旋转方向（真机若反了改成 -1.0）
 const STREAM_ROLL_SIGN: float = -1.0
-# 补偿系数。
-# ⚠️ Blender 端 car 相机已经**去掉横滚**（地平线永远水平），
-#    所以屏幕窗口只需要补**手机自身的横滚** → 系数 = 1.0（满量）
+# 补偿系数（Blender 端相机已去掉横滚 → 这里补满手机横滚 = 1.0）
 const STREAM_ROLL_GAIN: float = 1.0
-# 轻微平滑，避免画面随手指/传感器抖动
+# 画面抖动抑制：旋转平滑时间常数（越大越稳、越"肉"）
 const STREAM_ROLL_SMOOTH_TAU: float = 0.08
-# 调试：每秒打印一次重力与角度
+# 调试：每秒打印重力/角度
 const STREAM_ROLL_DEBUG: bool = false
 
+# ── 方向盘灵敏度（三档循环）──
+# STEER_SENSITIVITY % 3：
+#   0 = 最强（1.6×）  1 = 最弱（0.6×，默认）  2 = 次之（1.0×）
+const STEER_SENSITIVITY_MULTIPLIERS: Array = [1.6, 0.6, 1.0]
+const ICON_STEER_SENSITIVITY: Array = [
+	"res://resources/SteerSensitivityThree.svg",   # %3 == 0（最强）
+	"res://resources/SteerSensitivityOne.svg",     # %3 == 1（最弱）
+	"res://resources/SteerSensitivityTwo.svg",     # %3 == 2（次之）
+]
+
+var STEER_SENSITIVITY: int = 1
+var _steer_sensitivity_icons: Array = [null, null, null]
+
+# ── ZoomFit 缩放适配 ──
+# 放大/缩小过渡动画时长（秒）
+const ZOOM_FIT_TWEEN_TIME: float = 0.28
+
+# ── 发送与初始化 ──
+# 发送频率自适应 Blender 输出帧率（最低 60Hz，最高 120Hz）
+const MIN_SEND_RATE: float = 60.0
+const MAX_SEND_RATE: float = 120.0
+const INITIALIZE_RETRY_INTERVAL: float = 0.25
+
+# ── 车辆速度（油门）──
+# 速度变化平滑：每秒逼近目标速度的速率（越大越跟手）
+const SPEED_RAMP_PER_SECOND: float = 18.0
+# 油门力度曲线（>1 = 低段更柔和，满油门保持满速）
+# ⚠️ CarForwardArea 现在已经是连续油门，这里只是轻微踏板非线性 → 1.2 比较自然
+const THROTTLE_EXPO: float = 1.2
+# 油门归一化参考值（CarForwardArea 最大给出 9x）
+const THROTTLE_MAX_REF: float = 9.0
+
+# ── 转向（实际计算在 car_action.py，参数就在那个文件顶部）──
+#   STEER_EXPO            舵量曲线（>1 = 中心更细腻）
+#   STEER_SMOOTH_TAU      舵量平滑（抖动抑制）
+#   STEER_FULL_SPEED      速度联动参考（达到该速度转向才满效率）
+#   STEER_YAW_RATE_DEG_PER_SEC  满舵角速度
+#   STEER_MAX_DEG / STEER_DEADZONE_DEG / STEER_SIGN
+
+# ── 调试 ──
+# 打印四元数信息（平时保持 false）
+const VERBOSE_ORIENTATION_LOG := false
+
+# ── 推流画面状态 ──
 var stream_window: Control = null
 var _stream_roll: float = 0.0
 var _stream_debug_timer: float = 0.0
 # 测试用：非零时替代 Input.get_gravity()
 var _gravity_override: Vector3 = Vector3.ZERO
-
-const INITIALIZE_RETRY_INTERVAL: float = 0.25
-
-# 发送频率自适应 Blender 的输出帧率。
-# 最低 60 Hz，最高 120 Hz。
-const MIN_SEND_RATE: float = 60.0
-const MAX_SEND_RATE: float = 120.0
-
-# ---- 车辆速度变化的平滑效果 ----
-# 当前速度按固定速率逐渐逼近目标速度，而不是立即跳变。
-#
-# 例如：
-#   1x → 3x：约 0.11 秒
-#   1x → 9x：约 0.44 秒
-# 反向操作时也会先减速，再逐渐向相反方向加速。
-const SPEED_RAMP_PER_SECOND: float = 18.0
-
-# 打开后会持续打印四元数调试信息。
-# 正常使用时保持 false，避免大量日志影响调试。
-const VERBOSE_ORIENTATION_LOG := false
 
 # ── ZoomFit 按钮（缩放适配开关，目前只做样式）──
 var ZOOM_FIT: bool = false
@@ -66,9 +88,6 @@ const ICON_ZOOM_ON: String = "res://resources/Zoom.svg"
 
 var _icon_zoom_off: Texture2D = null
 var _icon_zoom_on: Texture2D = null
-
-# ZoomFit 缩放过渡动画时长（秒）
-const ZOOM_FIT_TWEEN_TIME: float = 0.28
 
 var _zoom_tween: Tween = null
 
@@ -91,6 +110,7 @@ var connection_node: Node = null
 # 读取 CarForwardArea 的 forward_speed。
 # 使用 Node 类型，避免依赖 Godot 的全局脚本类缓存。
 @onready var zoom_fit_button: Button = $ZoomFit
+@onready var steer_sensitivity_button: Button = $SteerSensitivity
 @onready var forward_area: Node = (
 	get_node_or_null("CarForwardArea")
 )
@@ -125,6 +145,12 @@ func _ramp_speed(delta: float) -> void:
 		if speed_value != null:
 			target_speed = float(speed_value)
 
+	# ── 油门力度曲线 ──
+	# CarForwardArea 给的是离散档位（后退 2x / 前进 1x、3x、9x）。
+	# 归一化后做指数曲线，再还原量级：
+	#   THROTTLE_EXPO > 1 → 低档更柔和，高档保持满速
+	target_speed = _apply_throttle_curve(target_speed)
+
 	_current_speed = move_toward(
 		_current_speed,
 		target_speed,
@@ -158,6 +184,17 @@ func _ready() -> void:
 		zoom_fit_button.expand_icon = true
 
 	_update_zoom_fit_icon()
+
+	# 方向盘灵敏度按钮：三个图标 + 初始样式
+	for i in range(ICON_STEER_SENSITIVITY.size()):
+		if ResourceLoader.exists(ICON_STEER_SENSITIVITY[i]):
+			_steer_sensitivity_icons[i] = load(ICON_STEER_SENSITIVITY[i])
+
+	if steer_sensitivity_button != null:
+		steer_sensitivity_button.focus_mode = Control.FOCUS_NONE
+		steer_sensitivity_button.expand_icon = true
+
+	_update_steer_sensitivity_icon()
 
 	stream_window = get_tree().root.find_child(
 		"StreamWindow",
@@ -281,7 +318,8 @@ func _process(delta: float) -> void:
 		"y": q.y,
 		"z": q.z,
 		"w": q.w,
-		"forward": forward_distance
+		"forward": forward_distance,
+		"steer_scale": _steer_sensitivity_scale()
 	}
 
 	connection_node.call(
@@ -377,6 +415,11 @@ func _input(event: InputEvent) -> void:
 		if event.pressed and _is_zoom_fit_hit(event.position):
 			_toggle_zoom_fit()
 			get_viewport().set_input_as_handled()
+			return
+
+		if event.pressed and _is_steer_sensitivity_hit(event.position):
+			_cycle_steer_sensitivity()
+			get_viewport().set_input_as_handled()
 
 		return
 
@@ -385,12 +428,16 @@ func _input(event: InputEvent) -> void:
 		if _touch_platform:
 			return
 
-		if (
-			event.pressed
-			and event.button_index == MOUSE_BUTTON_LEFT
-			and _is_zoom_fit_hit(event.position)
-		):
+		if not event.pressed or event.button_index != MOUSE_BUTTON_LEFT:
+			return
+
+		if _is_zoom_fit_hit(event.position):
 			_toggle_zoom_fit()
+			get_viewport().set_input_as_handled()
+			return
+
+		if _is_steer_sensitivity_hit(event.position):
+			_cycle_steer_sensitivity()
 			get_viewport().set_input_as_handled()
 
 
@@ -454,3 +501,65 @@ func _apply_zoom_fit() -> void:
 		_zoom_fit_target_scale(),
 		ZOOM_FIT_TWEEN_TIME
 	)
+
+
+## 油门力度曲线：保留符号，按 |值| 归一化后做指数
+func _apply_throttle_curve(raw_speed: float) -> float:
+	if is_zero_approx(raw_speed):
+		return 0.0
+
+	var sign_value: float = signf(raw_speed)
+	var normalized: float = clampf(
+		absf(raw_speed) / THROTTLE_MAX_REF,
+		0.0,
+		1.0
+	)
+
+	return sign_value * THROTTLE_MAX_REF * pow(normalized, THROTTLE_EXPO)
+
+
+# ============================================================
+# 方向盘灵敏度（三档循环）
+# ============================================================
+
+## 屏幕坐标是否落在灵敏度按钮上
+func _is_steer_sensitivity_hit(viewport_position: Vector2) -> bool:
+	if steer_sensitivity_button == null or not steer_sensitivity_button.visible:
+		return false
+
+	return steer_sensitivity_button.get_global_rect().has_point(viewport_position)
+
+
+## 点击：STEER_SENSITIVITY = (STEER_SENSITIVITY + 1) % 3
+func _cycle_steer_sensitivity() -> void:
+	STEER_SENSITIVITY = (STEER_SENSITIVITY + 1) % 3
+	_update_steer_sensitivity_icon()
+
+	print(
+		"[CarMode] STEER_SENSITIVITY =",
+		STEER_SENSITIVITY,
+		" 倍率 =",
+		_steer_sensitivity_scale()
+	)
+
+
+## 当前灵敏度倍率（按 %3 取档）
+func _steer_sensitivity_scale() -> float:
+	var index: int = STEER_SENSITIVITY % STEER_SENSITIVITY_MULTIPLIERS.size()
+
+	return float(STEER_SENSITIVITY_MULTIPLIERS[index])
+
+
+## 按当前档位设置图标
+func _update_steer_sensitivity_icon() -> void:
+	if steer_sensitivity_button == null:
+		return
+
+	var index: int = STEER_SENSITIVITY % _steer_sensitivity_icons.size()
+	var icon: Texture2D = _steer_sensitivity_icons[index]
+
+	if icon != null:
+		steer_sensitivity_button.icon = icon
+		steer_sensitivity_button.text = ""
+	else:
+		steer_sensitivity_button.text = str(index)

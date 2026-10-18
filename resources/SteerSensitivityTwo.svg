@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="120"
+   height="120"
+   viewBox="0 0 31.749999 31.75"
+   version="1.1"
+   id="svg1"
+   inkscape:version="1.4.4 (dcaf3e7d9e, 2026-05-05)"
+   sodipodi:docname="SteerSensitivityTwo.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#030303"
+     bordercolor="#999999"
+     borderopacity="1"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0"
+     inkscape:pagecheckerboard="true"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="px"
+     inkscape:zoom="3.5160359"
+     inkscape:cx="90.727174"
+     inkscape:cy="71.529418"
+     inkscape:window-width="1076"
+     inkscape:window-height="1224"
+     inkscape:window-x="872"
+     inkscape:window-y="130"
+     inkscape:window-maximized="0"
+     inkscape:current-layer="svg1" />
+  <defs
+     id="defs1" />
+  <circle
+     style="fill:#ffffff;stroke:none;stroke-width:0.709866;paint-order:markers fill stroke;opacity:0.3"
+     id="circle3"
+     cx="5.8106532"
+     cy="-28.232443"
+     r="3.9101765"
+     transform="rotate(120)"
+     inkscape:label="Level_3" />
+  <circle
+     style="fill:#ffffff;stroke:none;stroke-width:0.709866;paint-order:markers fill stroke"
+     id="circle5"
+     cx="-21.685654"
+     cy="-0.73613685"
+     r="3.9101765"
+     transform="rotate(-120)"
+     inkscape:label="Level_2" />
+  <circle
+     style="fill:#ffffff;stroke:none;stroke-width:0.709866;paint-order:markers fill stroke"
+     id="circle1"
+     cx="15.875"
+     cy="9.3282099"
+     r="3.9101765"
+     inkscape:label="Level_1" />
+</svg>
