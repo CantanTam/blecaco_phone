@@ -15,6 +15,31 @@ const BORDER_DISTANCE_BANDS: Array = [
 	{"max": 225.0, "color": Color("#ff0000a0")},
 ]
 
+# ── 临时功能开关（按需求分阶段实现）──
+# 右摇杆：控制 DRONE_EMPTY 沿局部 X / Y 移动（先禁用）
+const RIGHT_STICK_ENABLED: bool = true
+# TiltArea 双指倾斜手势（先禁用）
+const TILT_GESTURE_ENABLED: bool = true
+
+# ── TiltArea 双指手势 ──
+const TILT_SEND_HZ: float = 30.0
+# 每帧平均滑动多少像素算"满速"（越小越灵敏）
+const TILT_PIXELS_FULL: float = 12.0
+# "归水平 / 朝下" 两个一次性命令的去抖时间
+const TILT_GESTURE_COOLDOWN: float = 1.2
+
+# ── 速度档位：按摇杆距离分档（与边框颜色一一对应）──
+# 0=白(<15px) 1=绿(15~85) 2=黄(85~155) 3=红(155~225)
+const SPEED_TIER_MULTIPLIERS: Array = [0.25, 0.5, 1.0, 1.8]
+const SPEED_TIER_THRESHOLDS: Array = [15.0, 85.0, 155.0]
+# 迟滞（px）：避免在阈值附近来回跳档
+const SPEED_TIER_HYSTERESIS: float = 8.0
+
+# 摇杆数据的发送频率（Hz）
+const STICK_SEND_HZ: float = 30.0
+# 初始化消息的重试间隔（秒）
+const INITIALIZE_RETRY_INTERVAL: float = 0.5
+
 # 圆范围A：手指离开这个圆（以 StickArea 中心为圆心）→ 摇杆立刻回中心
 const STICK_CANCEL_RADIUS: float = 400.0
 
@@ -71,6 +96,29 @@ var BUTTON_DISTANCE: float = 0.0
 # 右侧同理
 var BUTTON_DISTANCE_RIGHT: float = 0.0
 
+# ── 归一化摇杆向量（长度 0~1，方向 = 摇杆方向；设备无关，可直接驱动无人机）──
+# 例：右推到底 → (1, 0)；左上 45° 半推 → (-0.35, -0.35)
+var left_stick_vector: Vector2 = Vector2.ZERO
+var right_stick_vector: Vector2 = Vector2.ZERO
+
+# ── 网络发送 ──
+var connection_node: Node = null
+var _send_timer: float = 0.0
+var _init_retry_timer: float = 0.0
+var _drone_initialized: bool = false
+var _drone_was_sending: bool = false
+
+# TiltArea 双指手势状态
+var _tilt_pointers: Dictionary = {}     # 手指 id → 当前视口坐标
+var _tilt_prev: Dictionary = {}         # 手指 id → 上一帧视口坐标
+var _tilt_accum: float = 0.0            # 累积的垂直滑动量（像素）
+var _tilt_send_timer: float = 0.0
+var _tilt_cooldown: float = 0.0
+
+# 当前速度档位（默认 2 = 黄档 = 1.0×）
+var _left_speed_tier: int = 2
+var _right_speed_tier: int = 2
+
 # 左右 StickArea 样式的副本（只改边框颜色，不影响场景里的共享资源）
 var left_area_style: StyleBoxFlat = null
 var right_area_style: StyleBoxFlat = null
@@ -85,6 +133,13 @@ func _ready() -> void:
 	_touch_platform = (
 		DisplayServer.is_touchscreen_available()
 		or OS.has_feature("mobile")
+	)
+
+	# 找 Connection 节点（发摇杆数据用）
+	connection_node = get_tree().root.find_child(
+		"Connection",
+		true,
+		false
 	)
 
 	# 保存摇杆按钮的原始偏移量
@@ -163,13 +218,30 @@ func _input(event: InputEvent) -> void:
 			# 尝试激活其中一个摇杆
 			if _try_start_stick(touch.index, touch.position):
 				get_viewport().set_input_as_handled()
+				return
+
+			# 其余触摸 → 记为倾斜手势的候选手指
+			# （飞行时 TiltArea 是隐藏的，所以不限制具体区域；
+			#   摇杆/开关已在上面的分支被占用，不会冲突）
+			_tilt_pointers[touch.index] = touch.position
+			_tilt_prev.erase(touch.index)
 		else:
-			# 手指松开，释放对应摇杆
+			# 手指松开，释放对应摇杆 / 移出倾斜手势
 			_end_stick(touch.index)
+
+			_tilt_pointers.erase(touch.index)
+			_tilt_prev.erase(touch.index)
+
+			if _tilt_pointers.is_empty():
+				_tilt_accum = 0.0
 
 	# 手机手指拖动
 	elif event is InputEventScreenDrag:
 		var drag := event as InputEventScreenDrag
+
+		if _tilt_pointers.has(drag.index):
+			_tilt_pointers[drag.index] = drag.position
+
 		_move_stick(drag.index, drag.position)
 
 	# 电脑鼠标按下或松开（触摸设备跳过：那是触摸事件的模拟副本）
@@ -299,6 +371,10 @@ func _try_start_stick(
 			left_stick_pointer_id = pointer_id
 			left_stick_touch_start = left_local
 			left_stick_latest_position = viewport_position
+
+			if DEBUG_INPUT:
+				print("[Drone] 左摇杆已捕获 (id=%d)" % pointer_id)
+
 			return true
 
 	# 尝试激活右摇杆
@@ -316,6 +392,10 @@ func _try_start_stick(
 			right_stick_pointer_id = pointer_id
 			right_stick_touch_start = right_local
 			right_stick_latest_position = viewport_position
+
+			if DEBUG_INPUT:
+				print("[Drone] 右摇杆已捕获 (id=%d)" % pointer_id)
+
 			return true
 
 	return false
@@ -343,6 +423,10 @@ func _process(_delta: float) -> void:
 		_apply_stick_position(false)
 
 	_update_area_border()
+	_update_speed_tiers()
+	_update_stick_vectors()
+	_send_sticks(_delta)
+	_update_tilt(_delta)
 
 
 ## 根据手指最新位置刷新某侧摇杆按钮的偏移
@@ -429,6 +513,9 @@ func _toggle_drone_status() -> void:
 
 	_update_toggle_visual(true)
 	_update_node_visibility()
+
+	# 通知 Blender：开启时创建 DRONE_EMPTY 并挂载摄像机，关闭时删除
+	_send_drone_rig_state(DRONE_STATU)
 
 
 func _update_toggle_visual(animated: bool) -> void:
@@ -566,3 +653,264 @@ func _apply_border_color(
 		style.border_color = BORDER_DISTANCE_BANDS[band]["color"]
 
 	return band
+
+
+## 每帧计算两侧归一化摇杆向量（除以圆范围B半径，所以满推 = 1.0）
+func _update_stick_vectors() -> void:
+	if STICK_LIMIT_RADIUS <= 0.0:
+		return
+
+	left_stick_vector = _stick_vector(left_stick_button, left_stick_area)
+	right_stick_vector = _stick_vector(right_stick_button, right_stick_area)
+
+
+## 按钮圆心相对区域中心的位移 → 归一化向量（长度 ≤ 1）
+func _stick_vector(button: Control, area: Control) -> Vector2:
+	var button_center: Vector2 = (
+		button.get_global_transform_with_canvas() * (button.size * 0.5)
+	)
+	var area_center: Vector2 = (
+		area.get_global_transform_with_canvas() * (area.size * 0.5)
+	)
+
+	return (button_center - area_center) / STICK_LIMIT_RADIUS
+
+
+## 把左右摇杆的归一化向量发给 Blender（"drone" 模式）
+func _send_sticks(delta: float) -> void:
+	if connection_node == null or not is_instance_valid(connection_node):
+		return
+
+	if not connection_node.has_method("send_action"):
+		return
+
+	# 关闭状态：发一次零值让 Blender 停下，并复位初始化标志
+	if not DRONE_STATU:
+		if _drone_was_sending:
+			_send_stick_payload(Vector2.ZERO, Vector2.ZERO)
+			_drone_was_sending = false
+
+		_drone_initialized = false
+		_init_retry_timer = 0.0
+		_send_timer = 0.0
+		return
+
+	# 先发初始化消息，成功后才开始发摇杆数据
+	if not _drone_initialized:
+		_init_retry_timer += delta
+
+		if _init_retry_timer < INITIALIZE_RETRY_INTERVAL:
+			return
+
+		_init_retry_timer = 0.0
+
+		var ok: bool = bool(
+			connection_node.call(
+				"send_action",
+				"drone",
+				{"command": "initialize"}
+			)
+		)
+
+		if ok:
+			_drone_initialized = true
+			print("[Drone] Blender 摄像机已初始化（开始发送摇杆数据）")
+
+		return
+
+	# 固定频率发送
+	_send_timer += delta
+
+	if _send_timer < 1.0 / STICK_SEND_HZ:
+		return
+
+	_send_timer = 0.0
+	_send_stick_payload(left_stick_vector, right_stick_vector)
+	_drone_was_sending = true
+
+
+## 发送一条摇杆数据：左杆=平移、右杆=转向，dt=本条消息代表的时间
+func _send_stick_payload(left_vector: Vector2, right_vector: Vector2) -> void:
+	connection_node.call(
+		"send_action",
+		"drone",
+		{
+			"command": "stick",
+			"lx": left_vector.x,
+			"ly": left_vector.y,
+			"rx": right_vector.x if RIGHT_STICK_ENABLED else 0.0,
+			"ry": right_vector.y if RIGHT_STICK_ENABLED else 0.0,
+			"speed_l": float(SPEED_TIER_MULTIPLIERS[_left_speed_tier]),
+			"speed_r": float(SPEED_TIER_MULTIPLIERS[_right_speed_tier]),
+			"dt": 1.0 / STICK_SEND_HZ,
+		}
+	)
+
+
+## 通知 Blender 创建 / 删除 DRONE_EMPTY 支架
+func _send_drone_rig_state(enabled: bool) -> void:
+	if connection_node == null or not is_instance_valid(connection_node):
+		return
+
+	if not connection_node.has_method("send_action"):
+		return
+
+	var ok: bool = bool(
+		connection_node.call(
+			"send_action",
+			"drone",
+			{"command": "enable" if enabled else "disable"}
+		)
+	)
+
+	print(
+		"[Drone] 通知 Blender：%s（%s）"
+		% [
+			"创建 DRONE_EMPTY" if enabled else "删除 DRONE_EMPTY",
+			"已发送" if ok else "发送失败"
+		]
+	)
+
+
+# ============================================================
+# TiltArea 双指手势 → 绕活动摄像机自身 X 轴旋转
+# ============================================================
+
+func _update_tilt(delta: float) -> void:
+	if not TILT_GESTURE_ENABLED:
+		return
+
+	_tilt_cooldown = maxf(_tilt_cooldown - delta, 0.0)
+
+	# 按需求：只有在 DRONE_STATU == true（飞行中）时才响应双指倾斜手势
+	if not DRONE_STATU:
+		_tilt_prev.clear()
+		_tilt_accum = 0.0
+		return
+
+	if _tilt_pointers.size() < 2:
+		_tilt_prev.clear()
+		_tilt_accum = 0.0
+		return
+
+	var ids: Array = _tilt_pointers.keys()
+	var id_a: int = ids[0]
+	var id_b: int = ids[1]
+	var pos_a: Vector2 = _tilt_pointers[id_a]
+	var pos_b: Vector2 = _tilt_pointers[id_b]
+
+	if not _tilt_prev.has(id_a) or not _tilt_prev.has(id_b):
+		_tilt_prev[id_a] = pos_a
+		_tilt_prev[id_b] = pos_b
+		return
+
+	var delta_a: Vector2 = pos_a - _tilt_prev[id_a]
+	var delta_b: Vector2 = pos_b - _tilt_prev[id_b]
+
+	_tilt_prev[id_a] = pos_a
+	_tilt_prev[id_b] = pos_b
+
+	var vertical_a: float = absf(delta_a.y)
+	var vertical_b: float = absf(delta_b.y)
+	var horizontal_a: float = absf(delta_a.x)
+	var horizontal_b: float = absf(delta_b.x)
+
+	var same_direction_up_down: bool = (
+		vertical_a > 1.0
+		and vertical_b > 1.0
+		and signf(delta_a.y) == signf(delta_b.y)
+	)
+	var opposite_up_down: bool = (
+		vertical_a > 6.0
+		and vertical_b > 6.0
+		and signf(delta_a.y) != signf(delta_b.y)
+	)
+	var opposite_left_right: bool = (
+		horizontal_a > 6.0
+		and horizontal_b > 6.0
+		and signf(delta_a.x) != signf(delta_b.x)
+	)
+
+	# 一个向上一个向下 → 归水平
+	if opposite_up_down and _tilt_cooldown <= 0.0:
+		_send_tilt_command("tilt_level")
+		_tilt_cooldown = TILT_GESTURE_COOLDOWN
+		return
+
+	# 一个向左一个向右 → 镜头朝下（世界 -Z）
+	if opposite_left_right and _tilt_cooldown <= 0.0:
+		_send_tilt_command("tilt_down")
+		_tilt_cooldown = TILT_GESTURE_COOLDOWN
+		return
+
+	# 同时向上 / 同时向下 → 增量旋转（上滑 = 正度数）
+	if same_direction_up_down:
+		_tilt_accum += -(delta_a.y + delta_b.y) * 0.5
+
+	_tilt_send_timer += delta
+
+	if _tilt_send_timer < 1.0 / TILT_SEND_HZ:
+		return
+
+	_tilt_send_timer = 0.0
+
+	var amount: float = clampf(_tilt_accum / TILT_PIXELS_FULL, -1.0, 1.0)
+	_tilt_accum = 0.0
+
+	if absf(amount) <= 0.02:
+		return
+
+	if connection_node == null or not is_instance_valid(connection_node):
+		return
+
+	if not connection_node.has_method("send_action"):
+		return
+
+	connection_node.call(
+		"send_action",
+		"drone",
+		{
+			"command": "tilt",
+			"amount": amount,
+			"dt": 1.0 / TILT_SEND_HZ,
+		}
+	)
+
+
+## 发送一次性倾斜命令（tilt_level / tilt_down）
+func _send_tilt_command(command: String) -> void:
+	if connection_node == null or not is_instance_valid(connection_node):
+		return
+
+	if not connection_node.has_method("send_action"):
+		return
+
+	connection_node.call("send_action", "drone", {"command": command})
+	print("[Drone] 发送倾斜命令：", command)
+
+
+## 按两侧 BUTTON_DISTANCE 更新速度档位（带迟滞，避免阈值附近抖动）
+func _update_speed_tiers() -> void:
+	_left_speed_tier = _next_speed_tier(BUTTON_DISTANCE, _left_speed_tier)
+	_right_speed_tier = _next_speed_tier(BUTTON_DISTANCE_RIGHT, _right_speed_tier)
+
+
+## 距离 → 档位（0..3），带迟滞
+func _next_speed_tier(distance: float, current: int) -> int:
+	var tier: int = current
+
+	# 升档：越过"阈值 + 迟滞"
+	while (
+		tier < SPEED_TIER_MULTIPLIERS.size() - 1
+		and distance >= SPEED_TIER_THRESHOLDS[tier] + SPEED_TIER_HYSTERESIS
+	):
+		tier += 1
+
+	# 降档：低于"阈值 - 迟滞"
+	while (
+		tier > 0
+		and distance < SPEED_TIER_THRESHOLDS[tier - 1] - SPEED_TIER_HYSTERESIS
+	):
+		tier -= 1
+
+	return tier
