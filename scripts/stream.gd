@@ -142,8 +142,18 @@ func _decode_worker() -> void:
 			decode_mutex.unlock()
 			continue
 
+		# 自动识别格式：WebP（RIFF 头）/ JPEG（FFD8 头）← 一期推流改用 WebP
 		var image := Image.new()
-		var error := image.load_jpg_from_buffer(jpeg_data)
+		var is_webp := (
+			jpeg_data.size() >= 12
+			and jpeg_data[0] == 0x52 and jpeg_data[1] == 0x49
+			and jpeg_data[2] == 0x46 and jpeg_data[3] == 0x46
+		)
+
+		var error := (
+			image.load_webp_from_buffer(jpeg_data) if is_webp
+			else image.load_jpg_from_buffer(jpeg_data)
+		)
 
 		decode_mutex.lock()
 
@@ -156,7 +166,7 @@ func _decode_worker() -> void:
 		decode_mutex.unlock()
 
 		if error != OK:
-			print("[Godot] JPEG decode failed: ", error)
+			print("[Godot] 帧解码失败: ", error)
 
 
 func _stop_decode_thread() -> void:
