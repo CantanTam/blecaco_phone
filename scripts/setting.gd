@@ -65,7 +65,6 @@ var _preview_lock_active: bool = false
 # ============================================================
 const NO_BLUR_BUTTONS: Array[String] = [
 	"ActiveCameSetButton",  # 摄像机选择页（camera_select.tscn）
-	"CameraSetButton",      # 摄像机设置页（待做）
 	"ShadeSetButton",       # 阴影设置页（待做）
 	"PreviewSetButton",     # 预览设置页（待做）
 	# TODO: 以后新增这类页面，把按钮名加在这里

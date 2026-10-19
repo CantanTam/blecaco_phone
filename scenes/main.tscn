@@ -10,7 +10,6 @@
 [ext_resource type="Script" uid="uid://dt4uybh6725bq" path="res://scripts/top_edge_area.gd" id="6_o6xl0"]
 [ext_resource type="Texture2D" uid="uid://bhhaqgr83jacj" path="res://resources/AddonSet.svg" id="7_eb6dy"]
 [ext_resource type="Texture2D" uid="uid://cw42vnbalgnhg" path="res://resources/ActiveCamSet.svg" id="8_a8y0u"]
-[ext_resource type="Texture2D" uid="uid://dafovemm2b11c" path="res://resources/CameraSet.svg" id="8_trceg"]
 [ext_resource type="Texture2D" uid="uid://dj8ejxar6n5h3" path="res://resources/ModeSet.svg" id="9_a8y0u"]
 [ext_resource type="Texture2D" uid="uid://c2iva32qn32p" path="res://resources/ShadeSet.svg" id="10_jkv2x"]
 [ext_resource type="Texture2D" uid="uid://bl55j1x1x4gr0" path="res://resources/PreviewSet.svg" id="11_jbj1t"]
@@ -218,9 +217,9 @@ layout_mode = 1
 anchors_preset = -1
 anchor_left = 0.5
 anchor_right = 0.5
-offset_left = -600.0
+offset_left = 0.0
 offset_top = -200.0
-offset_right = 600.0
+offset_right = 0.0
 offset_bottom = -10.0
 grow_horizontal = 2
 grow_vertical = 2
@@ -257,17 +256,6 @@ theme_override_styles/hover_pressed = SubResource("StyleBoxFlat_5urx4")
 toggle_mode = true
 button_group = SubResource("ButtonGroup_6hbff")
 icon = ExtResource("8_a8y0u")
-
-[node name="CameraSetButton" type="Button" parent="ModeContainer/Setting/OptionPanel/ButtonMargins/OptionButtons" unique_id=111036300]
-custom_minimum_size = Vector2(150, 150)
-layout_mode = 2
-theme_override_styles/normal = SubResource("StyleBoxFlat_loat6")
-theme_override_styles/pressed = SubResource("StyleBoxFlat_gsaqu")
-theme_override_styles/hover = SubResource("StyleBoxFlat_odhy6")
-theme_override_styles/hover_pressed = SubResource("StyleBoxFlat_5urx4")
-toggle_mode = true
-button_group = SubResource("ButtonGroup_6hbff")
-icon = ExtResource("8_trceg")
 
 [node name="ModeSetButton" type="Button" parent="ModeContainer/Setting/OptionPanel/ButtonMargins/OptionButtons" unique_id=541822083]
 custom_minimum_size = Vector2(150, 150)
