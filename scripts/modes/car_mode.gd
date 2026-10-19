@@ -80,6 +80,9 @@ var _stream_debug_timer: float = 0.0
 # 测试用：非零时替代 Input.get_gravity()
 var _gravity_override: Vector3 = Vector3.ZERO
 
+# 推流画面旋转是否被外部暂停（例如打开预览设置页时）
+var _stream_rotation_suspended: bool = false
+
 # ── ZoomFit 按钮（缩放适配开关，目前只做样式）──
 var ZOOM_FIT: bool = false
 
@@ -351,6 +354,10 @@ func _update_stream_rotation(delta: float) -> void:
 	if not STREAM_ROLL_ENABLED:
 		return
 
+	# 被外部暂停（打开预览设置页）→ 不更新旋转
+	if _stream_rotation_suspended:
+		return
+
 	if stream_window == null or not is_instance_valid(stream_window):
 		return
 
@@ -563,3 +570,20 @@ func _update_steer_sensitivity_icon() -> void:
 		steer_sensitivity_button.text = ""
 	else:
 		steer_sensitivity_button.text = str(index)
+
+
+## 外部开关：暂停 / 恢复推流画面的动态旋转
+##   暂停时立刻把画面转回水平（0°），避免预览页里看到歪的推流
+func set_stream_rotation_enabled(enabled: bool) -> void:
+	_stream_rotation_suspended = not enabled
+
+	if enabled:
+		print("[CarMode] 推流画面旋转：恢复")
+		return
+
+	_stream_roll = 0.0
+
+	if stream_window != null and is_instance_valid(stream_window):
+		stream_window.rotation = 0.0
+
+	print("[CarMode] 推流画面旋转：暂停（画面已回正）")

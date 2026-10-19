@@ -15,6 +15,19 @@ extends Control
 @onready var shade_set_button: Button = (
 	$OptionPanel/ButtonMargins/OptionButtons/ShadeSetButton
 )
+@onready var preview_set_button: Button = (
+	$OptionPanel/ButtonMargins/OptionButtons/PreviewSetButton
+)
+
+# ── 预览设置页打开时：强制停录制、强制 link，并隐藏这两个按钮 ──
+@onready var record_button: Node = get_node_or_null("../RecordButton")
+@onready var link_button: Node = get_node_or_null("../LinkButton")
+@onready var _preview_connection: Node = get_node_or_null("../../Connection")
+
+# 打开预览页前的 link 状态（true = 处于 unlink）
+var _preview_saved_link_unlink: bool = false
+# 预览页当前是否处于"打开"状态
+var _preview_lock_active: bool = false
 # ============================================================
 # 选项面板唤出时，盖在 stream 上面的「半透明 + 模糊」遮罩
 #
@@ -103,6 +116,7 @@ func _ready() -> void:
 	addon_set_button.toggled.connect(_on_addon_set_toggled)
 	active_came_set_button.toggled.connect(_on_active_came_set_toggled)
 	shade_set_button.toggled.connect(_on_shade_set_toggled)
+	preview_set_button.toggled.connect(_on_preview_set_toggled)
 
 	# 上面那几个「不要模糊」的按钮：按下/松开时重新决定遮罩要不要显示
 	for button_name in NO_BLUR_BUTTONS:
@@ -223,6 +237,9 @@ func _finish_hide() -> void:
 
 	for child in content_host.get_children():
 		child.queue_free()
+
+	# 预览页如果还开着，面板隐藏时也要恢复按钮与 link 状态
+	_exit_preview_lock()
 
 	# ⚠️ 要把 OptionButtons 里的按钮**全部**弹起来，不能只弹模式按钮：
 	#    按着 ShadeSet / AddonSet / ActiveCameSet 之类往上滑把面板收起时，
@@ -407,6 +424,40 @@ func _on_shade_set_toggled(is_toggled: bool) -> void:
 	print("[Setting] 已打开 ShadeSet")
 
 
+## 点 PreviewSetButton 时调用：把 preview_set_page.tscn 实例化到 ContentHost 下面。
+##
+## 和其它 *_set_page 一样：
+##   - 共用 ButtonGroup，同一时刻只有一个页面 ✓
+##   - OptionPanel 收起时 _finish_hide() 会清空 content_host → 页面跟着隐藏 ✓
+func _on_preview_set_toggled(is_toggled: bool) -> void:
+	for child in content_host.get_children():
+		child.queue_free()
+
+	if not is_toggled:
+		print("[Setting] 已关闭 PreviewSet")
+		_exit_preview_lock()
+		return
+
+	var packed_scene := load(
+		"res://scenes/preview_set_page.tscn"
+	) as PackedScene
+
+	if packed_scene == null:
+		push_error("[Setting] 找不到 preview_set_page.tscn")
+		return
+
+	var page := packed_scene.instantiate() as Control
+
+	if page == null:
+		push_error("[Setting] preview_set_page.tscn 的根节点必须是 Control")
+		return
+
+	content_host.add_child(page)
+	print("[Setting] 已打开 PreviewSet")
+
+	_enter_preview_lock()
+
+
 # ============================================================
 # 背景模糊遮罩（resources/ui_blur_mask.gdshader）
 #
@@ -562,3 +613,87 @@ func _on_qr_visibility_changed() -> void:
 		active_mode_host.modulate.a = 1.0
 
 	print("[Setting] 二维码页面出现，已立刻收起设置界面")
+
+
+# ============================================================
+# 预览设置页打开时的按钮锁定
+#
+# 打开：
+#   - 不管录制状态如何 → 强制停止录制
+#   - 不管 link 状态如何 → 强制恢复 link（取消 unlink）
+#   - 隐藏 RecordButton / LinkButton
+# 关闭：
+#   - 重新显示两个按钮
+#   - 录制状态**不恢复**（保持停止）
+#   - link 状态**恢复到打开预览页之前**
+# ============================================================
+
+func _enter_preview_lock() -> void:
+	if _preview_lock_active:
+		return
+
+	_preview_lock_active = true
+
+	# 1. 记住 LinkButton 的**显示状态**（不改它）
+	if link_button != null:
+		_preview_saved_link_unlink = bool(link_button.get("button_pressed"))
+		link_button.visible = false
+
+	# 2. 暂停向 Blender 发送 action（旋转 / 位移都停）
+	if _preview_connection != null and _preview_connection.has_method("set_action_sending_enabled"):
+		_preview_connection.call("set_action_sending_enabled", false)
+
+	# 3. 强制停止录制并隐藏 RecordButton
+	if record_button != null:
+		record_button.visible = false
+
+		if bool(record_button.get("is_recording")):
+			record_button.call("_on_pressed")
+
+	# 4. 暂停当前模式的推流画面旋转（只有 car_mode 有这个接口）
+	_set_active_stream_rotation(false)
+
+	print("[Setting] 打开预览页：已暂停发送 action、停止录制")
+
+
+func _exit_preview_lock() -> void:
+	if not _preview_lock_active:
+		return
+
+	_preview_lock_active = false
+
+	# 1. 重新显示按钮（录制状态保持停止，不恢复）
+	if record_button != null:
+		record_button.visible = true
+
+	# 2. LinkButton 显示状态保持和隐藏之前一样（只同步视觉）
+	if link_button != null:
+		link_button.visible = true
+		link_button.call("set_pressed_no_signal", _preview_saved_link_unlink)
+
+	# 3. 按 LinkButton 的显示状态决定是否恢复发送：
+	#    显示 unlink（_preview_saved_link_unlink = true）→ 保持暂停
+	#    显示 link  → 恢复发送
+	if _preview_connection != null and _preview_connection.has_method("set_action_sending_enabled"):
+		_preview_connection.call(
+			"set_action_sending_enabled",
+			not _preview_saved_link_unlink
+		)
+
+	# 4. 恢复推流画面旋转
+	_set_active_stream_rotation(true)
+
+	print(
+		"[Setting] 关闭预览页：发送状态恢复为",
+		"暂停" if _preview_saved_link_unlink else "继续"
+	)
+
+
+## 对当前活动模式设置"推流画面旋转"开关（只有 car_mode 实现了该方法）
+func _set_active_stream_rotation(enabled: bool) -> void:
+	if active_mode_host == null or not is_instance_valid(active_mode_host):
+		return
+
+	for mode in active_mode_host.get_children():
+		if mode.has_method("set_stream_rotation_enabled"):
+			mode.call("set_stream_rotation_enabled", enabled)

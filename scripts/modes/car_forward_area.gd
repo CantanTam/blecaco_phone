@@ -60,7 +60,8 @@ const THROTTLE_FWD_MAX: float = 9.0
 const THROTTLE_LATCH_ENABLED: bool = true
 const THROTTLE_LATCH_STILL_TIME: float = 0.30
 const THROTTLE_LATCH_BREAK_PX: float = 12.0     # 前进最高档（×）
-const THROTTLE_REV_MAX: float = 3.0     # 倒车最高档（×）
+# 倒车最高档 = 前进最高档 × 此比例（最小/最大倒退都按 60% 线性跟随）
+const THROTTLE_REV_RATIO: float = 0.6
 const THROTTLE_REVERSE_TOP: float = 370.0   # 倒车区上边界（此处速度 = 0）
 const THROTTLE_NEUTRAL_TOP: float = 430.0   # 空档区上边界
 const THROTTLE_FULL_Y: float = 610.0        # 满油门位置
@@ -353,7 +354,7 @@ func _continuous_speed_for_y(y_from_bottom: float) -> float:
 			1.0
 		)
 
-		return -THROTTLE_REV_MAX * t
+		return -(THROTTLE_FWD_MAX * THROTTLE_REV_RATIO) * t
 
 	# 空档死区：滑行不加速
 	if y_from_bottom <= THROTTLE_NEUTRAL_TOP:

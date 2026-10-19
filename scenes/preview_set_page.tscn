@@ -1,5 +1,98 @@
 [gd_scene format=3 uid="uid://c7008x0qm30j5"]
 
+[ext_resource type="Script" uid="uid://bm506ocesy5dm" path="res://scripts/preview_set_page.gd" id="1_script"]
+[ext_resource type="Texture2D" uid="uid://bwn307tawjr3q" path="res://resources/PreviewHomeFrame.svg" id="2_kxhrb"]
+[ext_resource type="Texture2D" uid="uid://dkqfe58psqdfo" path="res://resources/PreviewPrevFrame.svg" id="3_aco53"]
+[ext_resource type="Texture2D" uid="uid://5u6xgord8jqo" path="res://resources/PreviewReverse.svg" id="4_ky0bx"]
+[ext_resource type="Texture2D" uid="uid://8werlf25681a" path="res://resources/PreviewPlay.svg" id="5_g00bw"]
+[ext_resource type="Texture2D" uid="uid://bscnyl2mowt0y" path="res://resources/PreviewPause.svg" id="6_ec4v8"]
+[ext_resource type="Texture2D" uid="uid://ccok1xryvah8j" path="res://resources/PreviewNextFrame.svg" id="7_lk3si"]
+[ext_resource type="Texture2D" uid="uid://bwop4gw3vr6xw" path="res://resources/PreviewEndFrame.svg" id="8_135ej"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_h2u5x"]
+bg_color = Color(0, 0, 0, 0)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_sec1p"]
+bg_color = Color(0, 0, 0, 0.627451)
+corner_radius_top_left = 30
+corner_radius_bottom_left = 30
+corner_detail = 20
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ssig1"]
+bg_color = Color(0.2784314, 0.44705883, 0.7019608, 1)
+corner_radius_top_left = 30
+corner_radius_bottom_left = 30
+corner_detail = 20
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_trqyc"]
+bg_color = Color(0, 0, 0, 0.627451)
+corner_radius_top_left = 30
+corner_radius_bottom_left = 30
+corner_detail = 20
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_kxhrb"]
+bg_color = Color(0, 0, 0, 0.627451)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_x4tjv"]
+bg_color = Color(0.2784314, 0.44705883, 0.7019608, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_nd115"]
+bg_color = Color(0, 0, 0, 0.627451)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_apbeg"]
+bg_color = Color(0, 0, 0, 0.627451)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_cdqe4"]
+bg_color = Color(0.2784314, 0.44705883, 0.7019608, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_aco53"]
+bg_color = Color(0, 0, 0, 0.627451)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_play_normal"]
+bg_color = Color(0, 0, 0, 0.627451)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_play_pressed"]
+bg_color = Color(0.2784314, 0.44705883, 0.7019608, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_play_hover"]
+bg_color = Color(0, 0, 0, 0.627451)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_pause_normal"]
+bg_color = Color(0, 0, 0, 0.627451)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_pause_pressed"]
+bg_color = Color(0.2784314, 0.44705883, 0.7019608, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_pause_hover"]
+bg_color = Color(0, 0, 0, 0.627451)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_next_normal"]
+bg_color = Color(0, 0, 0, 0.627451)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_next_pressed"]
+bg_color = Color(0.2784314, 0.44705883, 0.7019608, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_next_hover"]
+bg_color = Color(0, 0, 0, 0.627451)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_end_normal"]
+bg_color = Color(0, 0, 0, 0.627451)
+corner_radius_top_right = 30
+corner_radius_bottom_right = 30
+corner_detail = 20
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_end_pressed"]
+bg_color = Color(0.2784314, 0.44705883, 0.7019608, 1)
+corner_radius_top_right = 30
+corner_radius_bottom_right = 30
+corner_detail = 20
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_end_hover"]
+bg_color = Color(0, 0, 0, 0.627451)
+corner_radius_top_right = 30
+corner_radius_bottom_right = 30
+corner_detail = 20
+
 [node name="PreviewSetPage" type="Control" unique_id=1646906137]
 layout_mode = 3
 anchors_preset = 15
@@ -7,3 +100,83 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+script = ExtResource("1_script")
+
+[node name="PreviewPanel" type="PanelContainer" parent="." unique_id=1192973208]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = 0.0
+offset_top = -170.0
+offset_right = 0.0
+offset_bottom = -20.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_styles/panel = SubResource("StyleBoxFlat_h2u5x")
+
+[node name="ButtonMargin" type="MarginContainer" parent="PreviewPanel" unique_id=204960628]
+layout_mode = 2
+
+[node name="PreviewButtons" type="HBoxContainer" parent="PreviewPanel/ButtonMargin" unique_id=164616081]
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="HomeFrame" type="Button" parent="PreviewPanel/ButtonMargin/PreviewButtons" unique_id=1809618645]
+custom_minimum_size = Vector2(150, 150)
+layout_mode = 2
+theme_override_styles/normal = SubResource("StyleBoxFlat_sec1p")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_ssig1")
+theme_override_styles/hover = SubResource("StyleBoxFlat_trqyc")
+icon = ExtResource("2_kxhrb")
+
+[node name="PrevFrame" type="Button" parent="PreviewPanel/ButtonMargin/PreviewButtons" unique_id=1106785934]
+custom_minimum_size = Vector2(150, 150)
+layout_mode = 2
+theme_override_styles/normal = SubResource("StyleBoxFlat_kxhrb")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_x4tjv")
+theme_override_styles/hover = SubResource("StyleBoxFlat_nd115")
+icon = ExtResource("3_aco53")
+
+[node name="Reverse" type="Button" parent="PreviewPanel/ButtonMargin/PreviewButtons" unique_id=1501300915]
+custom_minimum_size = Vector2(150, 150)
+layout_mode = 2
+theme_override_styles/normal = SubResource("StyleBoxFlat_apbeg")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_cdqe4")
+theme_override_styles/hover = SubResource("StyleBoxFlat_aco53")
+icon = ExtResource("4_ky0bx")
+
+[node name="Play" type="Button" parent="PreviewPanel/ButtonMargin/PreviewButtons" unique_id=812515172]
+custom_minimum_size = Vector2(150, 150)
+layout_mode = 2
+theme_override_styles/normal = SubResource("StyleBoxFlat_play_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_play_pressed")
+theme_override_styles/hover = SubResource("StyleBoxFlat_play_hover")
+icon = ExtResource("5_g00bw")
+
+[node name="Pause" type="Button" parent="PreviewPanel/ButtonMargin/PreviewButtons" unique_id=1327786198]
+visible = false
+custom_minimum_size = Vector2(300, 150)
+layout_mode = 2
+theme_override_styles/normal = SubResource("StyleBoxFlat_pause_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_pause_pressed")
+theme_override_styles/hover = SubResource("StyleBoxFlat_pause_hover")
+icon = ExtResource("6_ec4v8")
+
+[node name="NextFrame" type="Button" parent="PreviewPanel/ButtonMargin/PreviewButtons" unique_id=18730432]
+custom_minimum_size = Vector2(150, 150)
+layout_mode = 2
+theme_override_styles/normal = SubResource("StyleBoxFlat_next_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_next_pressed")
+theme_override_styles/hover = SubResource("StyleBoxFlat_next_hover")
+icon = ExtResource("7_lk3si")
+
+[node name="EndFrame" type="Button" parent="PreviewPanel/ButtonMargin/PreviewButtons" unique_id=1281190477]
+custom_minimum_size = Vector2(150, 150)
+layout_mode = 2
+theme_override_styles/normal = SubResource("StyleBoxFlat_end_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_end_pressed")
+theme_override_styles/hover = SubResource("StyleBoxFlat_end_hover")
+icon = ExtResource("8_135ej")
