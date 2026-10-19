@@ -67,6 +67,22 @@ var LIMIT_ORIENTATION: bool = false
 # 0.35× ≈ 31°/s（慢摇/拍视频）· 1.0× = 90°/s（标准）· 1.6× ≈ 144°/s（快速修正）
 const ROTATION_SENSITIVITY_MULTIPLIERS: Array = [0.35, 1.0, 1.6]
 
+# ── Roll 按钮（RollLeft / RollRight）──
+# 点按 = 固定 5° 一步（带平滑过渡 ✓）；长按超过阈值 = 连续慢速 roll（速度 × 灵敏度 ✓）
+const ROLL_TAP_STEP_DEG: float = 5.0          # 点按步进（固定，不受灵敏度影响）
+const ROLL_HOLD_DELAY_SEC: float = 1.0        # 长按判定时间（组合回正也用它）
+const ROLL_HOLD_RATE_DEG_PER_SEC: float = 12.0  # 连续 roll 速度（× 灵敏度）
+const ROLL_HOLD_SEND_HZ: float = 30.0         # 连续 roll 的发送频率
+const ROLL_BOTH_PRESS_WINDOW_SEC: float = 1.0 # 左右同时按下（回正）的时间窗
+
+# pointer_id → {"dir": ±1, "time": 按下时刻(ms), "holding": bool}
+var _roll_pointers: Dictionary = {}
+var _roll_hold_timer: float = 0.0
+
+# 左右同时按下（组合）状态：两边都按住满 ROLL_HOLD_DELAY_SEC 才回正
+var _roll_combo_pending: bool = false
+var _roll_combo_time: int = 0
+
 # 旋转灵敏度档位（0/1/2，点击循环）
 var ROTATION_SENSITIVITY: int = 0
 
@@ -104,6 +120,8 @@ const MOUSE_POINTER_ID: int = -2
 @onready var right_stick_guide: TextureRect = $RightStickArea/RightStickGuide
 @onready var tilt_area: Panel = $TiltArea
 @onready var limit_orientation_button: Button = $LimitOrientationButton
+@onready var roll_left_button: Button = $RollLeft
+@onready var roll_right_button: Button = $RollRight
 @onready var rotation_sensitivity_button: Button = $RotationSensitivityButton
 
 # 左右摇杆按钮
@@ -289,6 +307,34 @@ func _input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 				return
 
+			# Roll 按钮（左 / 右）
+			var roll_dir: int = _roll_button_direction(touch.position)
+
+			if roll_dir != 0:
+				var now: int = Time.get_ticks_msec()
+
+				# 同时按下（1 秒内）左右两个 → 进入组合状态，
+				# 需要两边都按住 2 秒才回正（见 _update_roll_hold）
+				if _has_opposite_roll_pointer(roll_dir, now):
+					_roll_combo_pending = true
+					_roll_combo_time = now
+
+				_roll_pointers[touch.index] = {
+					"dir": roll_dir,
+					"time": now,
+					"holding": false,
+				}
+
+				if DEBUG_INPUT:
+					print(
+						"[Drone] Roll 按下 index=%d dir=%d 当前指针数=%d combo=%s"
+						% [touch.index, roll_dir, _roll_pointers.size(), _roll_combo_pending]
+					)
+
+				# ⚠️ 不调用 set_input_as_handled()：
+				#    Android 上它可能让同一手势里的其它手指收不到 → 无法同时按两个 Roll 按钮 ✗
+				return
+
 			# 限向按钮
 			if _is_orientation_button_hit(touch.position):
 				_toggle_limit_orientation()
@@ -315,6 +361,14 @@ func _input(event: InputEvent) -> void:
 			_tilt_pointers[touch.index] = touch.position
 			_tilt_prev.erase(touch.index)
 		else:
+			# 手指松开：先看是不是 Roll 按钮（点按 = 步进 / 长按结束 = 停止）
+			if _roll_pointers.has(touch.index):
+				if DEBUG_INPUT:
+					print("[Drone] Roll 抬起 index=%d" % touch.index)
+
+				_release_roll(touch.index)
+				return
+
 			# 手指松开，释放对应摇杆 / 移出倾斜手势
 			_end_stick(touch.index)
 
@@ -531,6 +585,7 @@ func _process(_delta: float) -> void:
 	_update_speed_tiers()
 	_update_stick_vectors()
 	_update_smoothed_vectors(_delta)
+	_update_roll_hold(_delta)
 	_send_sticks(_delta)
 	_update_tilt(_delta)
 
@@ -1264,3 +1319,160 @@ func _rotation_sensitivity_scale() -> float:
 	var tier: int = ROTATION_SENSITIVITY % ROTATION_SENSITIVITY_MULTIPLIERS.size()
 
 	return float(ROTATION_SENSITIVITY_MULTIPLIERS[tier])
+
+
+# ============================================================
+# Roll 按钮（RollLeft / RollRight）
+#   点按（< ROLL_HOLD_DELAY_SEC）→ 走一步（Blender 端带平滑过渡）
+#   长按（≥ ROLL_HOLD_DELAY_SEC）→ 连续慢速 roll（受旋转灵敏度影响）
+# ============================================================
+
+## 屏幕坐标落在哪个 roll 按钮上（0 = 都不是，±1 = 左/右）
+func _roll_button_direction(viewport_position: Vector2) -> int:
+	# 方向：左 = +1，右 = -1（与 Blender 端旋转符号匹配）
+	if roll_left_button != null and roll_left_button.visible:
+		if roll_left_button.get_global_rect().has_point(viewport_position):
+			return 1
+
+	if roll_right_button != null and roll_right_button.visible:
+		if roll_right_button.get_global_rect().has_point(viewport_position):
+			return -1
+
+	return 0
+
+
+## 是否已经有一个"反方向"的 roll 指针，且在 ROLL_BOTH_PRESS_WINDOW 之内
+func _has_opposite_roll_pointer(direction: int, now_ms: int) -> bool:
+	for pointer_id in _roll_pointers.keys():
+		var info: Dictionary = _roll_pointers[pointer_id]
+
+		if int(info.get("dir", 0)) != -direction:
+			continue
+
+		var elapsed_ms: int = now_ms - int(info.get("time", now_ms))
+
+		if absi(elapsed_ms) <= int(ROLL_BOTH_PRESS_WINDOW_SEC * 1000.0):
+			return true
+
+	return false
+
+
+## 抬起：短按 → 发一次步进；长按结束 → 发停止
+func _release_roll(pointer_id: int) -> void:
+	var info: Dictionary = _roll_pointers.get(pointer_id, {})
+	_roll_pointers.erase(pointer_id)
+
+	if info.is_empty():
+		return
+
+	# 组合状态：松开就取消（不发步进、不回正）
+	if _roll_combo_pending:
+		_roll_combo_pending = false
+		_roll_pointers.clear()
+		_roll_hold_timer = 0.0
+		return
+
+	var direction: int = int(info.get("dir", 0))
+	var holding: bool = bool(info.get("holding", false))
+
+	if holding:
+		_send_roll({
+			"command": "roll_stop",
+		})
+		return
+
+	# 点按步进固定 5°（不受旋转灵敏度影响）
+	_send_roll({
+		"command": "roll_step",
+		"angle": ROLL_TAP_STEP_DEG * direction,
+	})
+
+
+## 每帧：判断长按是否到时间，并持续发送连续 roll
+func _update_roll_hold(delta: float) -> void:
+	if _roll_pointers.is_empty():
+		_roll_hold_timer = 0.0
+		_roll_combo_pending = false
+		return
+
+	var now: int = Time.get_ticks_msec()
+
+	# 组合（左右同时按下）：两边都按住满 2 秒 → 回正
+	if _roll_combo_pending:
+		if _roll_pointers.size() < 2:
+			_roll_combo_pending = false
+			_roll_hold_timer = 0.0
+			return
+
+		var held_ms: int = now - _roll_combo_time
+
+		if held_ms < int(ROLL_HOLD_DELAY_SEC * 1000.0):
+			_roll_hold_timer = 0.0
+			return
+
+		_roll_pointers.clear()
+		_roll_combo_pending = false
+		_roll_hold_timer = 0.0
+
+		_send_roll({
+			"command": "roll_reset",
+		})
+
+		print("[Drone] Roll 左右同按满 2 秒 → 回正")
+		return
+
+	var direction: int = 0
+
+	for pointer_id in _roll_pointers.keys():
+		var info: Dictionary = _roll_pointers[pointer_id]
+
+		if bool(info.get("holding", false)):
+			direction = int(info.get("dir", 0))
+			continue
+
+		var elapsed: float = float(now - int(info.get("time", now))) / 1000.0
+
+		if elapsed >= ROLL_HOLD_DELAY_SEC:
+			info["holding"] = true
+			_roll_pointers[pointer_id] = info
+			direction = int(info.get("dir", 0))
+
+	if direction == 0:
+		return
+
+	# 连续 roll：按固定频率发送
+	_roll_hold_timer += delta
+
+	var interval: float = 1.0 / maxf(ROLL_HOLD_SEND_HZ, 1.0)
+
+	if _roll_hold_timer < interval:
+		return
+
+	_roll_hold_timer -= interval
+
+	var k: int = int(floor(_roll_hold_timer / interval)) + 1
+	_roll_hold_timer -= interval * (k - 1)
+
+	var delta_deg: float = (
+		ROLL_HOLD_RATE_DEG_PER_SEC
+		* _rotation_sensitivity_scale()
+		* interval
+		* k
+		* direction
+	)
+
+	_send_roll({
+		"command": "roll_hold",
+		"delta": delta_deg,
+	})
+
+
+## 发送 roll 指令
+func _send_roll(data: Dictionary) -> void:
+	if connection_node == null or not is_instance_valid(connection_node):
+		return
+
+	if not connection_node.has_method("send_action"):
+		return
+
+	connection_node.call("send_action", "drone", data)
