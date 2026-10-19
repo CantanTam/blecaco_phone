@@ -17,8 +17,9 @@ extends Control
 # ---------------- 变量设置（改这里就够）----------------
 
 # 形状遮罩：两个材质共用同一张图
+# ⚠️ 飞机模式只有前进（不倒飞），所以用单独的 PlaneForward.svg（只有上三角）
 @export var mask_texture: Texture2D = preload(
-	"res://resources/ForwardBackward.svg"
+	"res://resources/PlaneForward.svg"
 )
 
 # 指尖光晕圆（ForwardColor）
@@ -43,7 +44,23 @@ const Y_YELLOW_TO_RED := 710.0   # 610 ~ 710   黄 -> 红
 #   正数 = 沿相机局部 -Z 前进（朝相机正对的方向飞）
 #   负数 = 沿相机局部 +Z 后退
 # 这些倍率之后还会再乘 Options 的 "plane/plane_speed"（全局速度缩放）。
-# 想改分段就改这两行，一一对应。
+# ── 连续油门（推荐，默认开启）──
+# 速度随手指高度线性增加，且边界与上面的**颜色边界**对齐：
+#   绿区(<350)   → 慢速
+#   黄区(515~610)→ 中速
+#   红区(>710)   → 满速
+# 飞机不倒飞，所以底部不再是后退档 ✓
+const PLANE_CONTINUOUS := true
+const PLANE_FWD_MAX: float = 9.0        # 满油门倍率
+const PLANE_FULL_Y: float = 710.0       # = Y_YELLOW_TO_RED，此处达到满速
+const PLANE_NEUTRAL_Y: float = 20.0     # 底部死区（停住）
+
+# ── 油门锁定（防手指滑移）──
+const THROTTLE_LATCH_ENABLED: bool = true
+const THROTTLE_LATCH_STILL_TIME: float = 0.30
+const THROTTLE_LATCH_BREAK_PX: float = 12.0
+
+# 分档模式（PLANE_CONTINUOUS = false 时使用）
 const SPEED_Y_LIMITS := [170.0, 370.0, 515.0, 610.0]
 const SPEED_VALUES := [-4.0, -2.0, 1.0, 3.0, 9.0]
 
@@ -70,6 +87,14 @@ var mouse_position: Vector2 = Vector2.ZERO
 # 供 plane_mode.gd 读取：手指位置对应的推进速度倍率
 # 带符号（正 = 前飞 / 负 = 后退），0 表示没按在区域内或已暂停发送
 var forward_speed: float = 0.0
+
+# 油门锁定状态
+var _latch_active: bool = false
+var _latch_speed: float = 0.0
+var _latch_y_from_bottom: float = 0.0
+var _still_time: float = 0.0
+var _last_y_from_bottom: float = -1.0
+var _current_y_from_bottom: float = -1.0
 
 # 当前是否允许发送 action（由 Connection.action_sending_changed 同步）
 var _actions_enabled: bool = true
@@ -195,7 +220,20 @@ func _update_feedback() -> void:
 	var y_from_bottom: float = size.y - local_position.y
 
 	# 速度倍率：按手指高度取段（带符号）；没按在区域内 / 已暂停时为 0
-	forward_speed = _speed_for_y(y_from_bottom) if is_inside else 0.0
+	_current_y_from_bottom = y_from_bottom if is_inside else -1.0
+
+	if not is_inside:
+		_reset_latch()
+		forward_speed = 0.0
+	elif _latch_active:
+		if absf(y_from_bottom - _latch_y_from_bottom) > THROTTLE_LATCH_BREAK_PX:
+			_latch_active = false
+			_still_time = 0.0
+			forward_speed = _speed_for_y(y_from_bottom)
+		else:
+			forward_speed = _latch_speed
+	else:
+		forward_speed = _speed_for_y(y_from_bottom)
 
 	# 箭头底色：按下 → 变实心；暂停时不参与，保持原样
 	bottom_color.color.a = (
@@ -263,11 +301,29 @@ func _color_for_y(y_from_bottom: float) -> Color:
 #   710 以上      同上（前进 9x）
 # 正数 = 沿相机局部 -Z 前进；负数 = 沿 +Z 后退（与 plane_action.py 一致）。
 func _speed_for_y(y_from_bottom: float) -> float:
+	if PLANE_CONTINUOUS:
+		return _continuous_speed_for_y(y_from_bottom)
+
 	for i in SPEED_Y_LIMITS.size():
 		if y_from_bottom <= SPEED_Y_LIMITS[i]:
 			return SPEED_VALUES[i]
 
 	return SPEED_VALUES[SPEED_VALUES.size() - 1]
+
+
+## 连续油门：底部 0 → PLANE_FULL_Y 处满速，与颜色边界对齐
+func _continuous_speed_for_y(y_from_bottom: float) -> float:
+	if y_from_bottom <= PLANE_NEUTRAL_Y:
+		return 0.0
+
+	var span: float = maxf(PLANE_FULL_Y - PLANE_NEUTRAL_Y, 1.0)
+	var t: float = clampf(
+		(y_from_bottom - PLANE_NEUTRAL_Y) / span,
+		0.0,
+		1.0
+	)
+
+	return PLANE_FWD_MAX * t
 
 
 # 节点尺寸变化时同步给 shader（UV → 像素换算要用）
@@ -283,3 +339,48 @@ func _update_glow_size() -> void:
 
 func _is_inside(point: Vector2) -> bool:
 	return get_global_rect().has_point(point)
+
+
+# ============================================================
+# 油门锁定：手指静止 → 锁定速度；明显移动 → 解锁
+# ============================================================
+
+func _process(delta: float) -> void:
+	if not THROTTLE_LATCH_ENABLED:
+		return
+
+	if _latch_active:
+		return
+
+	if _current_y_from_bottom < 0.0:
+		_still_time = 0.0
+		_last_y_from_bottom = -1.0
+		return
+
+	if (
+		_last_y_from_bottom >= 0.0
+		and absf(_current_y_from_bottom - _last_y_from_bottom) <= 1.0
+	):
+		_still_time += delta
+
+		if (
+			_still_time >= THROTTLE_LATCH_STILL_TIME
+			and not is_zero_approx(forward_speed)
+		):
+			_latch_active = true
+			_latch_speed = forward_speed
+			_latch_y_from_bottom = _current_y_from_bottom
+			_still_time = 0.0
+	else:
+		_still_time = 0.0
+
+	_last_y_from_bottom = _current_y_from_bottom
+
+
+## 清空锁定
+func _reset_latch() -> void:
+	_latch_active = false
+	_latch_speed = 0.0
+	_latch_y_from_bottom = 0.0
+	_still_time = 0.0
+	_last_y_from_bottom = -1.0

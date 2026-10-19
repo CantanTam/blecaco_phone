@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" uid="uid://bd8hvpt18g7g8" path="res://scripts/modes/plane_mode.gd" id="1_6ev5v"]
 [ext_resource type="Script" uid="uid://bppvbf3bgy4xa" path="res://scripts/modes/plane_forward_area.gd" id="2_n2t7d"]
-[ext_resource type="Texture2D" uid="uid://c2kt4a84s5cya" path="res://resources/ForwardBackward.svg" id="2_v5b1u"]
+[ext_resource type="Texture2D" uid="uid://b30lmyyvs077" path="res://resources/PlaneForward.svg" id="2_v5b1u"]
 [ext_resource type="Shader" uid="uid://b151oxp147mqy" path="res://resources/plane_mask.gdshader" id="3_g1exo"]
 [ext_resource type="Shader" uid="uid://cmd8mw3quq62e" path="res://resources/plane_touch_glow.gdshader" id="4_glow"]
 
@@ -18,6 +18,30 @@ shader_parameter/gradient_start = 0.0
 shader_parameter/mask_texture = ExtResource("2_v5b1u")
 shader_parameter/node_size = Vector2(1, 1)
 shader_parameter/circle_center = Vector2(0, 0)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_qnk50"]
+bg_color = Color(0, 0, 0, 0.627451)
+corner_radius_top_left = 60
+corner_radius_top_right = 60
+corner_radius_bottom_right = 60
+corner_radius_bottom_left = 60
+corner_detail = 20
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_sec1p"]
+bg_color = Color(0, 0, 0, 0.627451)
+corner_radius_top_left = 60
+corner_radius_top_right = 60
+corner_radius_bottom_right = 60
+corner_radius_bottom_left = 60
+corner_detail = 20
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_a6nh6"]
+bg_color = Color(0, 0, 0, 0.627451)
+corner_radius_top_left = 60
+corner_radius_top_right = 60
+corner_radius_bottom_right = 60
+corner_radius_bottom_left = 60
+corner_detail = 20
 
 [node name="PlaneMode" type="Control" unique_id=311837689]
 layout_mode = 3
@@ -75,3 +99,13 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 texture = ExtResource("2_v5b1u")
+
+[node name="StableButton" type="Button" parent="." unique_id=639274219]
+layout_mode = 1
+offset_left = 40.0
+offset_top = 200.0
+offset_right = 160.0
+offset_bottom = 320.0
+theme_override_styles/normal = SubResource("StyleBoxFlat_qnk50")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_sec1p")
+theme_override_styles/hover = SubResource("StyleBoxFlat_a6nh6")

@@ -33,6 +33,26 @@ const MAX_SEND_RATE: float = 120.0
 # 想要更跟手就调大（25~30），想要更沉稳/更"重"就调小（10~12）。
 const SPEED_RAMP_PER_SECOND: float = 18.0
 
+# ── 飞行轨迹防抖等级（StableButton，四档循环）──
+# PLANE_STABLE_LEVEL % 4：1 → 0（无防抖） 2 → 0.05  3 → 0.12  0 → 0.3
+const STABLE_ICONS: Array = [
+	"res://resources/StableLevelThree.svg",   # %4 == 0 → τ 0.30
+	"res://resources/StableLevelZero.svg",    # %4 == 1 → τ 0
+	"res://resources/StableLevelOne.svg",     # %4 == 2 → τ 0.05
+	"res://resources/StableLevelTwo.svg",     # %4 == 3 → τ 0.12
+]
+const STABLE_TAUS: Array = [0.30, 0.0, 0.05, 0.12]
+
+var PLANE_STABLE_LEVEL: int = 1
+var _stable_icons: Array = [null, null, null, null]
+
+# 触摸平台标志（真机会把触摸也发一份模拟鼠标事件，需要忽略）
+var _touch_platform: bool = false
+
+# 油门力度曲线（>1 = 低段更柔和；连续油门本身已线性，1.2 比较自然）
+const THROTTLE_EXPO: float = 1.2
+const THROTTLE_MAX_REF: float = 9.0
+
 # 打开后会以 ~60Hz 打印每条四元数，会把 logcat 环形缓冲区冲掉，
 # 导致真正有用的日志在你回看时已经消失；排查时再改 true。
 const VERBOSE_ORIENTATION_LOG := false
@@ -50,8 +70,10 @@ var _current_speed: float = 0.0
 var connection_node: Node = null
 
 # 表现层节点：本文件只读它的 forward_speed（带符号速度倍率）
-@onready var forward_area: PlaneForwardArea = (
-	get_node_or_null("PlaneForwardArea") as PlaneForwardArea
+# 用 Node 类型 + get() 访问，避免依赖 Godot 的全局类缓存
+@onready var stable_button: Button = $StableButton
+@onready var forward_area: Node = (
+	get_node_or_null("PlaneForwardArea")
 )
 
 
@@ -77,7 +99,13 @@ func _ramp_speed(delta: float) -> void:
 	var target_speed := 0.0
 
 	if forward_area != null:
-		target_speed = forward_area.forward_speed
+		var speed_value: Variant = forward_area.get("forward_speed")
+
+		if speed_value != null:
+			target_speed = float(speed_value)
+
+	# 油门力度曲线
+	target_speed = _apply_throttle_curve(target_speed)
 
 	_current_speed = move_toward(
 		_current_speed,
@@ -93,6 +121,22 @@ var free_mode_initialized: bool = false
 
 
 func _ready() -> void:
+	# StableButton：四个图标 + 初始样式
+	for i in range(STABLE_ICONS.size()):
+		if ResourceLoader.exists(STABLE_ICONS[i]):
+			_stable_icons[i] = load(STABLE_ICONS[i])
+
+	_touch_platform = (
+		DisplayServer.is_touchscreen_available()
+		or OS.has_feature("mobile")
+	)
+
+	if stable_button != null:
+		stable_button.focus_mode = Control.FOCUS_NONE
+		stable_button.expand_icon = true
+
+	_update_stable_icon()
+
 	# 查找现有的 Connection 节点
 	connection_node = get_tree().root.find_child(
 		"Connection",
@@ -205,7 +249,8 @@ func _process(delta: float) -> void:
 		"y": q.y,
 		"z": q.z,
 		"w": q.w,
-		"forward": forward_distance
+		"forward": forward_distance,
+		"stable_tau": _stable_tau()
 	}
 
 	connection_node.call(
@@ -233,3 +278,92 @@ func _on_action_sending_changed(enabled: bool) -> void:
 		print("[Orientation] Link 恢复：已重新校准手机姿态")
 	else:
 		push_warning("[Orientation] Link 恢复：手机姿态重新校准失败（暂无数据？）")
+
+
+## 油门力度曲线：保留符号，按 |值| 归一化后做指数
+func _apply_throttle_curve(raw_speed: float) -> float:
+	if is_zero_approx(raw_speed):
+		return 0.0
+
+	var sign_value: float = signf(raw_speed)
+	var normalized: float = clampf(
+		absf(raw_speed) / THROTTLE_MAX_REF,
+		0.0,
+		1.0
+	)
+
+	return sign_value * THROTTLE_MAX_REF * pow(normalized, THROTTLE_EXPO)
+
+
+## 离开 Plane Mode：把速度与计时器复位，避免残留状态
+func _exit_tree() -> void:
+	_current_speed = 0.0
+	rotation_send_timer = 0.0
+	initialize_retry_timer = 0.0
+
+
+# ============================================================
+# 飞行轨迹防抖等级（StableButton）
+# ============================================================
+
+## 当前防抖时间常数（秒）
+func _stable_tau() -> float:
+	return float(STABLE_TAUS[PLANE_STABLE_LEVEL % 4])
+
+
+## 触摸/鼠标输入：命中 StableButton 就切换档位
+func _input(event: InputEvent) -> void:
+	if event is InputEventScreenTouch:
+		if event.pressed and _is_stable_hit(event.position):
+			_cycle_stable_level()
+			get_viewport().set_input_as_handled()
+
+		return
+
+	if event is InputEventMouseButton:
+		if _touch_platform:
+			return
+
+		if (
+			event.pressed
+			and event.button_index == MOUSE_BUTTON_LEFT
+			and _is_stable_hit(event.position)
+		):
+			_cycle_stable_level()
+			get_viewport().set_input_as_handled()
+
+
+## 屏幕坐标是否落在 StableButton 上
+func _is_stable_hit(viewport_position: Vector2) -> bool:
+	if stable_button == null or not stable_button.visible:
+		return false
+
+	return stable_button.get_global_rect().has_point(viewport_position)
+
+
+## 点击：PLANE_STABLE_LEVEL = (PLANE_STABLE_LEVEL + 1) % 4
+func _cycle_stable_level() -> void:
+	PLANE_STABLE_LEVEL = (PLANE_STABLE_LEVEL + 1) % 4
+	_update_stable_icon()
+
+	print(
+		"[PlaneMode] PLANE_STABLE_LEVEL =",
+		PLANE_STABLE_LEVEL,
+		" τ =",
+		_stable_tau()
+	)
+
+
+## 按当前等级设置图标
+func _update_stable_icon() -> void:
+	if stable_button == null:
+		return
+
+	var index: int = PLANE_STABLE_LEVEL % 4
+	var icon: Texture2D = _stable_icons[index]
+
+	if icon != null:
+		stable_button.icon = icon
+		stable_button.text = ""
+	else:
+		stable_button.text = str(index)
