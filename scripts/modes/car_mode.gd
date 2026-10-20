@@ -170,10 +170,15 @@ func _ramp_speed(delta: float) -> void:
 	#   THROTTLE_EXPO > 1 → 低档更柔和，高档保持满速
 	target_speed = _apply_throttle_curve(target_speed)
 
+	# ⚠️ delta 异常大时（App 刚启动 / 场景加载卡顿）会一帧冲到满速 ✗
+	#    表现为"第一次点前进突然窜出去一大段" ✗
+	#    限制到 50ms（20fps）以内 ✓
+	var ramp_delta: float = clampf(delta, 0.0, 0.05)
+
 	_current_speed = move_toward(
 		_current_speed,
 		target_speed,
-		SPEED_RAMP_PER_SECOND * delta
+		SPEED_RAMP_PER_SECOND * ramp_delta
 	)
 
 
