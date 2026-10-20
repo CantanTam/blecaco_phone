@@ -187,6 +187,14 @@ var car_mode_initialized: bool = false
 # ── SetEarth 相关 ──────────────────────────────────────
 
 
+## 屏幕坐标是否落在 SetEarth 按钮上
+func _is_set_earth_hit(viewport_position: Vector2) -> bool:
+	if set_earth_button == null or not set_earth_button.visible:
+		return false
+
+	return set_earth_button.get_global_rect().has_point(viewport_position)
+
+
 ## 按 HAS_EARTH 更新图标
 func _update_set_earth_icon() -> void:
 	if set_earth_button == null:
@@ -217,15 +225,21 @@ func _update_set_earth_visibility() -> void:
 		return
 
 	var unlinked: bool = bool(_link_button.get("button_pressed"))
+
+	if set_earth_button.visible != unlinked:
+		print("[CarMode][DBG] SetEarth 可见性 → ", unlinked, "（unlink=", unlinked, "）")
+
 	set_earth_button.visible = unlinked
 
 
 func _on_set_earth_button_down() -> void:
+	print("[CarMode][DBG] SetEarth button_down")
 	_set_earth_holding = true
 	_set_earth_hold_time = 0.0
 
 
 func _on_set_earth_button_up() -> void:
+	print("[CarMode][DBG] SetEarth button_up  按住时长=%.2fs" % _set_earth_hold_time)
 	_set_earth_holding = false
 	_set_earth_hold_time = 0.0
 
@@ -293,11 +307,15 @@ func _ready() -> void:
 	if set_earth_button != null:
 		set_earth_button.focus_mode = Control.FOCUS_NONE
 		set_earth_button.expand_icon = true
-		set_earth_button.button_down.connect(_on_set_earth_button_down)
-		set_earth_button.button_up.connect(_on_set_earth_button_up)
+		# ⚠️ 不用 button_down/button_up 信号：真机上不可靠 ✗
+		#    改用 _input() 手动矩形命中检测（和 drone_mode 的 Roll 按钮同一套做法）
 
 	_update_set_earth_icon()
 	_update_set_earth_visibility()
+	print("[CarMode][DBG] SetEarth 初始化：按钮存在=", set_earth_button != null,
+		" 可见=", set_earth_button.visible if set_earth_button else false,
+		" HAS_EARTH=", HAS_EARTH,
+		" 图标已加载=", _icon_no_earth != null and _icon_has_earth != null)
 
 	stream_window = get_tree().root.find_child(
 		"StreamWindow",
@@ -524,6 +542,17 @@ func _is_zoom_fit_hit(viewport_position: Vector2) -> bool:
 ## 触摸/鼠标输入：命中 ZoomFit 就切换（用矩形命中，不用 Button.pressed）
 func _input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch:
+		# SetEarth：按下开始计时，抬起结束（手动命中检测，真机可靠 ✓）
+		if event.pressed and _is_set_earth_hit(event.position):
+			print("[CarMode][DBG] SetEarth 触摸按下 pos=", event.position)
+			_on_set_earth_button_down()
+			# ⚠️ 不调用 set_input_as_handled()，与其他按钮保持一致
+			return
+
+		if not event.pressed and _set_earth_holding:
+			_on_set_earth_button_up()
+			return
+
 		if event.pressed and _is_zoom_fit_hit(event.position):
 			_toggle_zoom_fit()
 			get_viewport().set_input_as_handled()
@@ -540,7 +569,18 @@ func _input(event: InputEvent) -> void:
 		if _touch_platform:
 			return
 
-		if not event.pressed or event.button_index != MOUSE_BUTTON_LEFT:
+		if event.button_index != MOUSE_BUTTON_LEFT:
+			return
+
+		# 鼠标松开：结束 SetEarth 长按
+		if not event.pressed:
+			if _set_earth_holding:
+				_on_set_earth_button_up()
+			return
+
+		if _is_set_earth_hit(event.position):
+			_on_set_earth_button_down()
+			get_viewport().set_input_as_handled()
 			return
 
 		if _is_zoom_fit_hit(event.position):
