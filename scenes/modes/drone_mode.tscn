@@ -3,7 +3,6 @@
 [ext_resource type="Texture2D" uid="uid://4c3crnxhyu52" path="res://resources/LeftStickGuide.svg" id="1_pvlyq"]
 [ext_resource type="Script" uid="uid://cnv58stj0uspj" path="res://scripts/modes/drone_mode.gd" id="1_v3fqs"]
 [ext_resource type="Texture2D" uid="uid://5ieeksw1hqa2" path="res://resources/RightStickGuide.svg" id="2_2a3o2"]
-[ext_resource type="Texture2D" uid="uid://csrc2a7st8xne" path="res://resources/TiltAreaGuide.svg" id="3_2a3o2"]
 [ext_resource type="Texture2D" uid="uid://eico232d7hyj" path="res://resources/DroneRollLeft.svg" id="5_414rb"]
 [ext_resource type="Texture2D" uid="uid://chgppmtbw6nb1" path="res://resources/DroneRollRight.svg" id="6_1ha33"]
 
@@ -77,6 +76,14 @@ corner_detail = 20
 shadow_color = Color(0, 0, 0, 0.627451)
 shadow_size = 3
 shadow_offset = Vector2(0, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_jg6ql"]
+bg_color = Color(0, 0, 0, 0.627451)
+corner_radius_top_left = 20
+corner_radius_top_right = 20
+corner_radius_bottom_right = 20
+corner_radius_bottom_left = 20
+corner_detail = 20
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_wr66y"]
 bg_color = Color(0, 0, 0, 0.627451)
@@ -190,7 +197,6 @@ grow_vertical = 0
 theme_override_styles/panel = SubResource("StyleBoxFlat_gsaqu")
 
 [node name="LeftStickGuide" type="TextureRect" parent="LeftStickArea" unique_id=835047911]
-visible = false
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -280,6 +286,7 @@ offset_left = 750.0
 offset_top = 50.0
 offset_right = -750.0
 offset_bottom = -50.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_jg6ql")
 
 [node name="TiltAreaGuide" type="TextureRect" parent="TiltArea" unique_id=721659929]
 layout_mode = 1
@@ -288,7 +295,6 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-texture = ExtResource("3_2a3o2")
 
 [node name="LimitOrientationButton" type="Button" parent="." unique_id=2116037143]
 layout_mode = 1
