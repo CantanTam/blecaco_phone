@@ -8,7 +8,7 @@
    version="1.1"
    id="svg1"
    inkscape:version="1.4.4 (dcaf3e7d9e, 2026-05-05)"
-   sodipodi:docname="NoCarEarth.svg"
+   sodipodi:docname="NoCarGround.svg"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns="http://www.w3.org/2000/svg"
@@ -24,36 +24,26 @@
      inkscape:deskcolor="#d1d1d1"
      inkscape:document-units="px"
      inkscape:zoom="2.6527235"
-     inkscape:cx="15.078842"
-     inkscape:cy="50.702608"
+     inkscape:cx="72.56693"
+     inkscape:cy="115.16466"
      inkscape:window-width="2560"
      inkscape:window-height="1354"
      inkscape:window-x="0"
      inkscape:window-y="0"
      inkscape:window-maximized="1"
-     inkscape:current-layer="layer1" />
+     inkscape:current-layer="svg1" />
   <defs
      id="defs1" />
-  <g
-     inkscape:label="图层 1"
-     inkscape:groupmode="layer"
-     id="layer1">
-    <path
-       sodipodi:type="star"
-       style="fill:#ffffff;stroke-width:2.64583;stroke-linecap:round;stroke-linejoin:round;paint-order:markers fill stroke;opacity:0.3"
-       id="path1"
-       inkscape:flatsided="false"
-       sodipodi:sides="5"
-       sodipodi:cx="12.268052"
-       sodipodi:cy="10.871688"
-       sodipodi:r1="15.299648"
-       sodipodi:r2="7.6498241"
-       sodipodi:arg1="0.52359878"
-       sodipodi:arg2="1.1519173"
-       inkscape:rounded="0"
-       inkscape:randomized="0"
-       d="M 25.517936,18.521512 15.379516,17.86015 9.0870763,25.837002 6.5831249,15.990419 -2.9477831,12.470937 5.64311,7.0467759 6.0451246,-3.1052363 13.85854,3.3890307 23.637907,0.63422501 19.87597,10.072063 Z"
-       inkscape:transform-center-y="-2.6423853"
-       transform="matrix(0.69083557,0,0,0.69083557,8.5756974,8.3868432)" />
-  </g>
+  <circle
+     style="fill:#ffffff;stroke:none;stroke-width:1.97059;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none;stroke-opacity:1;paint-order:markers fill stroke"
+     id="path4"
+     cx="15.874853"
+     cy="13.451719"
+     r="1.984375"
+     inkscape:label="Part_2" />
+  <path
+     style="baseline-shift:baseline;display:inline;overflow:visible;opacity:0.3;vector-effect:none;fill:#ffffff;stroke-linecap:round;stroke-linejoin:round;paint-order:markers fill stroke;enable-background:accumulate;stop-color:#000000"
+     d="M 10.056641,8.0717418 A 0.9261326,0.9261326 0 0 0 9.1425779,8.8510387 L 7.253906,20.548304 a 0.9261326,0.9261326 0 0 0 0.9140626,1.074219 H 23.582031 a 0.9261326,0.9261326 0 0 0 0.914063,-1.074219 L 22.607422,8.8510387 A 0.9261326,0.9261326 0 0 0 21.693359,8.0717418 Z m 0.789062,1.8535156 h 10.058594 l 1.589844,9.8437496 H 9.2558592 Z"
+     id="path3"
+     inkscape:label="Part_1" />
 </svg>
