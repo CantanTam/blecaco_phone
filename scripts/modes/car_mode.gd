@@ -233,14 +233,9 @@ func _send_ground_command(enabled: bool) -> void:
 		print("[CarMode] Connection 不可用，无法发送地面命令")
 		return
 
-	var sent = connection_node.call(
-		"send_action",
-		"car",
-		{
-			"command": "set_ground",
-			"enabled": enabled,
-		}
-	)
+	# ⚠️ 不能用 send_action：unlink 状态下它被禁用 ✗
+	#    改用 connection.send_ground（type = "ground" 不受门控）✓
+	var sent = connection_node.call("send_ground", enabled)
 
 	print("[CarMode] 发送地面命令 enabled=", enabled, " 成功=", sent)
 
