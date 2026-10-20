@@ -102,10 +102,14 @@ texture = ExtResource("2_v5b1u")
 
 [node name="StableButton" type="Button" parent="." unique_id=639274219]
 layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
 offset_left = 40.0
-offset_top = 200.0
+offset_top = -160.0
 offset_right = 160.0
-offset_bottom = 320.0
+offset_bottom = -40.0
+grow_vertical = 0
 theme_override_styles/normal = SubResource("StyleBoxFlat_qnk50")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_sec1p")
 theme_override_styles/hover = SubResource("StyleBoxFlat_a6nh6")

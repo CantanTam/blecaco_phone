@@ -225,6 +225,25 @@ func _on_ground_status(has_ground: bool, object_name: String) -> void:
 	_update_set_ground_icon()
 
 
+## LinkButton 切换：pressed=true 表示 unlink（暂停），false 表示 link（恢复）
+## ⚠️ 重新 link 时把 car_mode_initialized 清零 ✗
+##    → 下一帧会重发 initialize
+##    → Blender 用【当前相机的旋转/位置】重新做基准 ✓
+##    → 不会再把手机上累积的转向数据强加到相机上 ✓
+func _on_link_toggled(pressed: bool) -> void:
+	if pressed:
+		# unlink：暂停发送
+		print("[CarMode] unlink")
+		return
+
+	# link：重新初始化（用 Blender 当前相机姿态做基准）
+	car_mode_initialized = false
+	initialize_retry_timer = 0.0
+	phone_calibrated = false
+
+	print("[CarMode] 重新 link → 将用 Blender 当前相机姿态重新初始化")
+
+
 ## 通知 Blender 开启/关闭地面标记
 ##   enabled = true  → Blender 沿相机局部 -Y 打射线，第一个命中的物体打上 is_ground
 ##   enabled = false → Blender 删掉已标记物体的 is_ground
@@ -341,6 +360,14 @@ func _ready() -> void:
 		steer_sensitivity_button.expand_icon = true
 
 	_update_steer_sensitivity_icon()
+
+	# LinkButton：re-link 时需要重新初始化（用 Blender 当前相机姿态做基准）
+	var link_btn := get_tree().root.find_child("LinkButton", true, false)
+
+	if link_btn != null and link_btn.has_signal("toggled"):
+		if not link_btn.toggled.is_connected(_on_link_toggled):
+			link_btn.toggled.connect(_on_link_toggled)
+		print("[CarMode] 已监听 LinkButton（re-link 会重新初始化）")
 
 	# SetGround：加载两个图标 + 接长按信号 + 初始显示状态
 	if ResourceLoader.exists(ICON_NO_GROUND):
