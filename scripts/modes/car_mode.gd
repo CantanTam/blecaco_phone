@@ -195,6 +195,36 @@ func _is_set_ground_hit(viewport_position: Vector2) -> bool:
 	return set_ground_button.get_global_rect().has_point(viewport_position)
 
 
+## 解析 Blender 推来的 ground_status 消息
+func _on_ground_status_message(message: String) -> void:
+	var data: Variant = JSON.parse_string(message)
+
+	if not (data is Dictionary):
+		return
+
+	if data.get("type") != "ground_status":
+		return
+
+	_on_ground_status(
+		bool(data.get("has_ground", false)),
+		str(data.get("object", ""))
+	)
+
+
+## Blender 回报地面标记结果
+##   has_ground = true  → 打标成功，跟踪该物体
+##   has_ground = false → 没打到物体，HAS_GROUND 保持 false（Blender 用水平面兜底）
+func _on_ground_status(has_ground: bool, object_name: String) -> void:
+	HAS_GROUND = has_ground
+
+	if HAS_GROUND:
+		print("[CarMode] 地面追踪：开启（已标记 ", object_name, "）")
+	else:
+		print("[CarMode] 地面追踪：关闭（使用水平面）")
+
+	_update_set_ground_icon()
+
+
 ## 通知 Blender 开启/关闭地面标记
 ##   enabled = true  → Blender 沿相机局部 -Y 打射线，第一个命中的物体打上 is_ground
 ##   enabled = false → Blender 删掉已标记物体的 is_ground
@@ -276,17 +306,13 @@ func _tick_set_ground_hold(delta: float) -> void:
 
 	_set_ground_holding = false
 	_set_ground_hold_time = 0.0
-	HAS_GROUND = not HAS_GROUND
 
+	# 已开启 → 直接关闭；未开启 → 请 Blender 打射线判定
+	# （射线打不到物体时 Blender 会回 has_ground = false，此时用水平面当地面）
 	if HAS_GROUND:
-		print("[CarMode] 地面追踪：开启（HAS_GROUND = true）")
+		_send_ground_command(false)
 	else:
-		print("[CarMode] 地面追踪：关闭（HAS_GROUND = false）")
-
-	_update_set_ground_icon()
-
-	# 通知 Blender：由它沿相机局部 -Y 找第一个物体并打 is_ground 标记
-	_send_ground_command(HAS_GROUND)
+		_send_ground_command(true)
 
 
 func _ready() -> void:
@@ -355,6 +381,16 @@ func _ready() -> void:
 		true,
 		false
 	)
+
+	# 接收 Blender 回报的 ground_status（决定 HAS_GROUND）
+	if connection_node != null and is_instance_valid(connection_node):
+		if connection_node.has_signal("text_message_received"):
+			if not connection_node.text_message_received.is_connected(
+				_on_ground_status_message
+			):
+				connection_node.text_message_received.connect(
+					_on_ground_status_message
+				)
 
 	if rotation_sender.is_available():
 		print("[CarMode] Orientation plugin loaded")
