@@ -125,7 +125,7 @@ theme_override_styles/normal = SubResource("StyleBoxFlat_qnk50")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_sec1p")
 theme_override_styles/hover = SubResource("StyleBoxFlat_a6nh6")
 
-[node name="SetEarth" type="Button" parent="." unique_id=622389084]
+[node name="SetGround" type="Button" parent="." unique_id=622389084]
 layout_mode = 1
 offset_left = 40.0
 offset_top = 760.0

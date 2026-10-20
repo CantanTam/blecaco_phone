@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://c464jjiw7bmue"
-path="res://.godot/imported/HasCarEarth.svg-e742c2a05e24e29c45ba7d15aed1840e.ctex"
+uid="uid://clnbb1u2vj8l7"
+path="res://.godot/imported/HasCarGround.svg-7fb5d5eb1df5c40672007e9389488032.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://resources/HasCarEarth.svg"
-dest_files=["res://.godot/imported/HasCarEarth.svg-e742c2a05e24e29c45ba7d15aed1840e.ctex"]
+source_file="res://resources/HasCarGround.svg"
+dest_files=["res://.godot/imported/HasCarGround.svg-7fb5d5eb1df5c40672007e9389488032.ctex"]
 
 [params]
 

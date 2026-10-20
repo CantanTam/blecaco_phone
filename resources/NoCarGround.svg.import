@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bmaeh34d4bfhx"
-path="res://.godot/imported/NoCarEarth.svg-49a38251ae5dc1f9f9db44863a330dab.ctex"
+uid="uid://bre45xdgqj61v"
+path="res://.godot/imported/NoCarGround.svg-f8b3b454089a283fe766600389a8ce42.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://resources/NoCarEarth.svg"
-dest_files=["res://.godot/imported/NoCarEarth.svg-49a38251ae5dc1f9f9db44863a330dab.ctex"]
+source_file="res://resources/NoCarGround.svg"
+dest_files=["res://.godot/imported/NoCarGround.svg-f8b3b454089a283fe766600389a8ce42.ctex"]
 
 [params]
 

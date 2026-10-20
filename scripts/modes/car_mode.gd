@@ -89,19 +89,19 @@ var ZOOM_FIT: bool = false
 const ICON_ZOOM_OFF: String = "res://resources/UnZoom.svg"
 const ICON_ZOOM_ON: String = "res://resources/Zoom.svg"
 
-# ── SetEarth：地面追踪开关 ──────────────────────────────
-# 只在 unlink 状态显示；长按 2 秒切换 HAS_EARTH
-const ICON_NO_EARTH: String = "res://resources/NoCarEarth.svg"
-const ICON_HAS_EARTH: String = "res://resources/HasCarEarth.svg"
-const SET_EARTH_HOLD_SEC: float = 2.0
+# ── SetGround：地面追踪开关 ──────────────────────────────
+# 只在 unlink 状态显示；长按 2 秒切换 HAS_GROUND
+const ICON_NO_GROUND: String = "res://resources/NoCarGround.svg"
+const ICON_HAS_GROUND: String = "res://resources/HasCarGround.svg"
+const SET_GROUND_HOLD_SEC: float = 2.0
 
 # 是否启用地面追踪（默认关闭）
-var HAS_EARTH: bool = false
+var HAS_GROUND: bool = false
 
-var _icon_no_earth: Texture2D = null
-var _icon_has_earth: Texture2D = null
-var _set_earth_holding: bool = false
-var _set_earth_hold_time: float = 0.0
+var _icon_no_ground: Texture2D = null
+var _icon_has_ground: Texture2D = null
+var _set_ground_holding: bool = false
+var _set_ground_hold_time: float = 0.0
 var _link_button: Node = null
 
 var _icon_zoom_off: Texture2D = null
@@ -129,7 +129,7 @@ var connection_node: Node = null
 # 使用 Node 类型，避免依赖 Godot 的全局脚本类缓存。
 @onready var zoom_fit_button: Button = $ZoomFit
 @onready var steer_sensitivity_button: Button = $SteerSensitivity
-@onready var set_earth_button: Button = $SetEarth
+@onready var set_ground_button: Button = $SetGround
 @onready var forward_area: Node = (
 	get_node_or_null("CarForwardArea")
 )
@@ -184,32 +184,52 @@ var phone_calibrated: bool = false
 var car_mode_initialized: bool = false
 
 
-# ── SetEarth 相关 ──────────────────────────────────────
+# ── SetGround 相关 ──────────────────────────────────────
 
 
-## 屏幕坐标是否落在 SetEarth 按钮上
-func _is_set_earth_hit(viewport_position: Vector2) -> bool:
-	if set_earth_button == null or not set_earth_button.visible:
+## 屏幕坐标是否落在 SetGround 按钮上
+func _is_set_ground_hit(viewport_position: Vector2) -> bool:
+	if set_ground_button == null or not set_ground_button.visible:
 		return false
 
-	return set_earth_button.get_global_rect().has_point(viewport_position)
+	return set_ground_button.get_global_rect().has_point(viewport_position)
 
 
-## 按 HAS_EARTH 更新图标
-func _update_set_earth_icon() -> void:
-	if set_earth_button == null:
+## 通知 Blender 开启/关闭地面标记
+##   enabled = true  → Blender 沿相机局部 -Y 打射线，第一个命中的物体打上 is_ground
+##   enabled = false → Blender 删掉已标记物体的 is_ground
+func _send_ground_command(enabled: bool) -> void:
+	if connection_node == null or not is_instance_valid(connection_node):
+		print("[CarMode] Connection 不可用，无法发送地面命令")
 		return
 
-	var tex: Texture2D = _icon_has_earth if HAS_EARTH else _icon_no_earth
+	var sent = connection_node.call(
+		"send_action",
+		"car",
+		{
+			"command": "set_ground",
+			"enabled": enabled,
+		}
+	)
+
+	print("[CarMode] 发送地面命令 enabled=", enabled, " 成功=", sent)
+
+
+## 按 HAS_GROUND 更新图标
+func _update_set_ground_icon() -> void:
+	if set_ground_button == null:
+		return
+
+	var tex: Texture2D = _icon_has_ground if HAS_GROUND else _icon_no_ground
 
 	if tex != null:
-		set_earth_button.icon = tex
+		set_ground_button.icon = tex
 
 
 ## 只在 unlink 状态显示
 ## LinkButton.button_pressed: true = unlink，false = link
-func _update_set_earth_visibility() -> void:
-	if set_earth_button == null:
+func _update_set_ground_visibility() -> void:
+	if set_ground_button == null:
 		return
 
 	if _link_button == null:
@@ -221,49 +241,52 @@ func _update_set_earth_visibility() -> void:
 
 	if _link_button == null:
 		# 找不到 LinkButton 时保守隐藏，避免误操作
-		set_earth_button.visible = false
+		set_ground_button.visible = false
 		return
 
 	var unlinked: bool = bool(_link_button.get("button_pressed"))
 
-	if set_earth_button.visible != unlinked:
-		print("[CarMode][DBG] SetEarth 可见性 → ", unlinked, "（unlink=", unlinked, "）")
+	if set_ground_button.visible != unlinked:
+		print("[CarMode][DBG] SetGround 可见性 → ", unlinked, "（unlink=", unlinked, "）")
 
-	set_earth_button.visible = unlinked
-
-
-func _on_set_earth_button_down() -> void:
-	print("[CarMode][DBG] SetEarth button_down")
-	_set_earth_holding = true
-	_set_earth_hold_time = 0.0
+	set_ground_button.visible = unlinked
 
 
-func _on_set_earth_button_up() -> void:
-	print("[CarMode][DBG] SetEarth button_up  按住时长=%.2fs" % _set_earth_hold_time)
-	_set_earth_holding = false
-	_set_earth_hold_time = 0.0
+func _on_set_ground_button_down() -> void:
+	print("[CarMode][DBG] SetGround button_down")
+	_set_ground_holding = true
+	_set_ground_hold_time = 0.0
 
 
-## 长按计时：达到 SET_EARTH_HOLD_SEC 就切换 HAS_EARTH
-func _tick_set_earth_hold(delta: float) -> void:
-	if not _set_earth_holding:
+func _on_set_ground_button_up() -> void:
+	print("[CarMode][DBG] SetGround button_up  按住时长=%.2fs" % _set_ground_hold_time)
+	_set_ground_holding = false
+	_set_ground_hold_time = 0.0
+
+
+## 长按计时：达到 SET_GROUND_HOLD_SEC 就切换 HAS_GROUND
+func _tick_set_ground_hold(delta: float) -> void:
+	if not _set_ground_holding:
 		return
 
-	_set_earth_hold_time += delta
+	_set_ground_hold_time += delta
 
-	if _set_earth_hold_time < SET_EARTH_HOLD_SEC:
+	if _set_ground_hold_time < SET_GROUND_HOLD_SEC:
 		return
 
-	_set_earth_holding = false
-	_set_earth_hold_time = 0.0
-	HAS_EARTH = not HAS_EARTH
+	_set_ground_holding = false
+	_set_ground_hold_time = 0.0
+	HAS_GROUND = not HAS_GROUND
 
-	if HAS_EARTH:
-		print("[CarMode] 地面追踪：开启（HAS_EARTH = true）")
+	if HAS_GROUND:
+		print("[CarMode] 地面追踪：开启（HAS_GROUND = true）")
 	else:
-		print("[CarMode] 地面追踪：关闭（HAS_EARTH = false）")
+		print("[CarMode] 地面追踪：关闭（HAS_GROUND = false）")
 
-	_update_set_earth_icon()
+	_update_set_ground_icon()
+
+	# 通知 Blender：由它沿相机局部 -Y 找第一个物体并打 is_ground 标记
+	_send_ground_command(HAS_GROUND)
 
 
 func _ready() -> void:
@@ -297,25 +320,25 @@ func _ready() -> void:
 
 	_update_steer_sensitivity_icon()
 
-	# SetEarth：加载两个图标 + 接长按信号 + 初始显示状态
-	if ResourceLoader.exists(ICON_NO_EARTH):
-		_icon_no_earth = load(ICON_NO_EARTH)
+	# SetGround：加载两个图标 + 接长按信号 + 初始显示状态
+	if ResourceLoader.exists(ICON_NO_GROUND):
+		_icon_no_ground = load(ICON_NO_GROUND)
 
-	if ResourceLoader.exists(ICON_HAS_EARTH):
-		_icon_has_earth = load(ICON_HAS_EARTH)
+	if ResourceLoader.exists(ICON_HAS_GROUND):
+		_icon_has_ground = load(ICON_HAS_GROUND)
 
-	if set_earth_button != null:
-		set_earth_button.focus_mode = Control.FOCUS_NONE
-		set_earth_button.expand_icon = true
+	if set_ground_button != null:
+		set_ground_button.focus_mode = Control.FOCUS_NONE
+		set_ground_button.expand_icon = true
 		# ⚠️ 不用 button_down/button_up 信号：真机上不可靠 ✗
 		#    改用 _input() 手动矩形命中检测（和 drone_mode 的 Roll 按钮同一套做法）
 
-	_update_set_earth_icon()
-	_update_set_earth_visibility()
-	print("[CarMode][DBG] SetEarth 初始化：按钮存在=", set_earth_button != null,
-		" 可见=", set_earth_button.visible if set_earth_button else false,
-		" HAS_EARTH=", HAS_EARTH,
-		" 图标已加载=", _icon_no_earth != null and _icon_has_earth != null)
+	_update_set_ground_icon()
+	_update_set_ground_visibility()
+	print("[CarMode][DBG] SetGround 初始化：按钮存在=", set_ground_button != null,
+		" 可见=", set_ground_button.visible if set_ground_button else false,
+		" HAS_GROUND=", HAS_GROUND,
+		" 图标已加载=", _icon_no_ground != null and _icon_has_ground != null)
 
 	stream_window = get_tree().root.find_child(
 		"StreamWindow",
@@ -354,10 +377,10 @@ func _process(delta: float) -> void:
 	# 画面动态旋转：放在所有提前 return 之前，独立于网络/姿态数据
 	_update_stream_rotation(delta)
 
-	# SetEarth：长按计时 + 跟随 link 状态显示/隐藏
+	# SetGround：长按计时 + 跟随 link 状态显示/隐藏
 	# （放在提前 return 之前，保证 link 状态变化立刻生效）
-	_tick_set_earth_hold(delta)
-	_update_set_earth_visibility()
+	_tick_set_ground_hold(delta)
+	_update_set_ground_visibility()
 
 	if not rotation_sender.has_orientation_data():
 		return
@@ -542,15 +565,15 @@ func _is_zoom_fit_hit(viewport_position: Vector2) -> bool:
 ## 触摸/鼠标输入：命中 ZoomFit 就切换（用矩形命中，不用 Button.pressed）
 func _input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch:
-		# SetEarth：按下开始计时，抬起结束（手动命中检测，真机可靠 ✓）
-		if event.pressed and _is_set_earth_hit(event.position):
-			print("[CarMode][DBG] SetEarth 触摸按下 pos=", event.position)
-			_on_set_earth_button_down()
+		# SetGround：按下开始计时，抬起结束（手动命中检测，真机可靠 ✓）
+		if event.pressed and _is_set_ground_hit(event.position):
+			print("[CarMode][DBG] SetGround 触摸按下 pos=", event.position)
+			_on_set_ground_button_down()
 			# ⚠️ 不调用 set_input_as_handled()，与其他按钮保持一致
 			return
 
-		if not event.pressed and _set_earth_holding:
-			_on_set_earth_button_up()
+		if not event.pressed and _set_ground_holding:
+			_on_set_ground_button_up()
 			return
 
 		if event.pressed and _is_zoom_fit_hit(event.position):
@@ -572,14 +595,14 @@ func _input(event: InputEvent) -> void:
 		if event.button_index != MOUSE_BUTTON_LEFT:
 			return
 
-		# 鼠标松开：结束 SetEarth 长按
+		# 鼠标松开：结束 SetGround 长按
 		if not event.pressed:
-			if _set_earth_holding:
-				_on_set_earth_button_up()
+			if _set_ground_holding:
+				_on_set_ground_button_up()
 			return
 
-		if _is_set_earth_hit(event.position):
-			_on_set_earth_button_down()
+		if _is_set_ground_hit(event.position):
+			_on_set_ground_button_down()
 			get_viewport().set_input_as_handled()
 			return
 
