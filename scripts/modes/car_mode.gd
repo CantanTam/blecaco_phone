@@ -89,6 +89,21 @@ var ZOOM_FIT: bool = false
 const ICON_ZOOM_OFF: String = "res://resources/UnZoom.svg"
 const ICON_ZOOM_ON: String = "res://resources/Zoom.svg"
 
+# ── SetEarth：地面追踪开关 ──────────────────────────────
+# 只在 unlink 状态显示；长按 2 秒切换 HAS_EARTH
+const ICON_NO_EARTH: String = "res://resources/NoCarEarth.svg"
+const ICON_HAS_EARTH: String = "res://resources/HasCarEarth.svg"
+const SET_EARTH_HOLD_SEC: float = 2.0
+
+# 是否启用地面追踪（默认关闭）
+var HAS_EARTH: bool = false
+
+var _icon_no_earth: Texture2D = null
+var _icon_has_earth: Texture2D = null
+var _set_earth_holding: bool = false
+var _set_earth_hold_time: float = 0.0
+var _link_button: Node = null
+
 var _icon_zoom_off: Texture2D = null
 var _icon_zoom_on: Texture2D = null
 
@@ -114,6 +129,7 @@ var connection_node: Node = null
 # 使用 Node 类型，避免依赖 Godot 的全局脚本类缓存。
 @onready var zoom_fit_button: Button = $ZoomFit
 @onready var steer_sensitivity_button: Button = $SteerSensitivity
+@onready var set_earth_button: Button = $SetEarth
 @onready var forward_area: Node = (
 	get_node_or_null("CarForwardArea")
 )
@@ -168,6 +184,74 @@ var phone_calibrated: bool = false
 var car_mode_initialized: bool = false
 
 
+# ── SetEarth 相关 ──────────────────────────────────────
+
+
+## 按 HAS_EARTH 更新图标
+func _update_set_earth_icon() -> void:
+	if set_earth_button == null:
+		return
+
+	var tex: Texture2D = _icon_has_earth if HAS_EARTH else _icon_no_earth
+
+	if tex != null:
+		set_earth_button.icon = tex
+
+
+## 只在 unlink 状态显示
+## LinkButton.button_pressed: true = unlink，false = link
+func _update_set_earth_visibility() -> void:
+	if set_earth_button == null:
+		return
+
+	if _link_button == null:
+		_link_button = get_tree().root.find_child(
+			"LinkButton",
+			true,
+			false
+		)
+
+	if _link_button == null:
+		# 找不到 LinkButton 时保守隐藏，避免误操作
+		set_earth_button.visible = false
+		return
+
+	var unlinked: bool = bool(_link_button.get("button_pressed"))
+	set_earth_button.visible = unlinked
+
+
+func _on_set_earth_button_down() -> void:
+	_set_earth_holding = true
+	_set_earth_hold_time = 0.0
+
+
+func _on_set_earth_button_up() -> void:
+	_set_earth_holding = false
+	_set_earth_hold_time = 0.0
+
+
+## 长按计时：达到 SET_EARTH_HOLD_SEC 就切换 HAS_EARTH
+func _tick_set_earth_hold(delta: float) -> void:
+	if not _set_earth_holding:
+		return
+
+	_set_earth_hold_time += delta
+
+	if _set_earth_hold_time < SET_EARTH_HOLD_SEC:
+		return
+
+	_set_earth_holding = false
+	_set_earth_hold_time = 0.0
+	HAS_EARTH = not HAS_EARTH
+
+	if HAS_EARTH:
+		print("[CarMode] 地面追踪：开启（HAS_EARTH = true）")
+	else:
+		print("[CarMode] 地面追踪：关闭（HAS_EARTH = false）")
+
+	_update_set_earth_icon()
+
+
 func _ready() -> void:
 	# 找推流画面节点（stream.tscn 里的 StreamWindow，全屏铺满）
 	# ZoomFit 按钮：两个图标 + 初始样式
@@ -198,6 +282,22 @@ func _ready() -> void:
 		steer_sensitivity_button.expand_icon = true
 
 	_update_steer_sensitivity_icon()
+
+	# SetEarth：加载两个图标 + 接长按信号 + 初始显示状态
+	if ResourceLoader.exists(ICON_NO_EARTH):
+		_icon_no_earth = load(ICON_NO_EARTH)
+
+	if ResourceLoader.exists(ICON_HAS_EARTH):
+		_icon_has_earth = load(ICON_HAS_EARTH)
+
+	if set_earth_button != null:
+		set_earth_button.focus_mode = Control.FOCUS_NONE
+		set_earth_button.expand_icon = true
+		set_earth_button.button_down.connect(_on_set_earth_button_down)
+		set_earth_button.button_up.connect(_on_set_earth_button_up)
+
+	_update_set_earth_icon()
+	_update_set_earth_visibility()
 
 	stream_window = get_tree().root.find_child(
 		"StreamWindow",
@@ -235,6 +335,11 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	# 画面动态旋转：放在所有提前 return 之前，独立于网络/姿态数据
 	_update_stream_rotation(delta)
+
+	# SetEarth：长按计时 + 跟随 link 状态显示/隐藏
+	# （放在提前 return 之前，保证 link 状态变化立刻生效）
+	_tick_set_earth_hold(delta)
+	_update_set_earth_visibility()
 
 	if not rotation_sender.has_orientation_data():
 		return
