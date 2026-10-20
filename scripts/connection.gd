@@ -134,16 +134,6 @@ func send_action(mode: String, data: Dictionary) -> bool:
 	return send_json(message)
 
 
-## 地面标记命令（type = "ground"）
-## ⚠️ 不走 action 门控：SetGround 按钮只在 unlink 状态显示，
-##    而 unlink 恰好会禁用 action 发送 ✗ 所以必须用独立类型 ✓
-func send_ground(enabled: bool) -> bool:
-	return send_json({
-		"type": "ground",
-		"enabled": enabled,
-	})
-
-
 func send_setting(setting_name: String, value: Variant) -> bool:
 	var message := {
 		"type": "setting",

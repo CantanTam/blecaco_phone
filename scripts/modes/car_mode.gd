@@ -234,8 +234,9 @@ func _send_ground_command(enabled: bool) -> void:
 		return
 
 	# ⚠️ 不能用 send_action：unlink 状态下它被禁用 ✗
-	#    改用 connection.send_ground（type = "ground" 不受门控）✓
-	var sent = connection_node.call("send_ground", enabled)
+	#    改用 send_setting（type = "setting" 不受门控）✓
+	#    setting 通道本来就是「手机 → Blender 单向命令」的既有通路
+	var sent = connection_node.call("send_setting", "ground", enabled)
 
 	print("[CarMode] 发送地面命令 enabled=", enabled, " 成功=", sent)
 
