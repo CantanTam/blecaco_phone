@@ -41,7 +41,7 @@ const MODE_SCENES := {
 	"DroneCover": "res://scenes/modes/drone_mode.tscn"
 }
 
-const DEFAULT_MODE_SCENE := MODE_SCENES["FreeCover"]
+const DEFAULT_MODE_SCENE := MODE_SCENES["DroneCover"]
 
 # ------------------------------------------------------------
 # 所有「可持久化选项」的默认值都登记在这里。

@@ -22,7 +22,7 @@ const CENTER_POP_DURATION := 0.125
 @onready var cover_flow: Control = $CoverFlow
 @onready var cover_glow: ColorRect = $CoverFlow/CoverGlow
 
-var selected_cover_name: String = "FreeCover"
+var selected_cover_name: String = "DroneCover"
 var current_mode_scene_path: String = ""
 var cover_animation_running: bool = false
 
