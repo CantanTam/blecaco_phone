@@ -75,6 +75,13 @@ func _set_button_center(global_center: Vector2) -> void:
 	_update_run_notice(global_center)
 
 
+## 取控件的【几何圆心】（全局坐标）
+func _control_center(control: Control) -> Vector2:
+	if control == null:
+		return Vector2.ZERO
+	return control.global_position + control.size * 0.5
+
+
 ## 屏幕坐标是否落在 MoveButton 上
 func _is_move_button_hit(viewport_position: Vector2) -> bool:
 	if move_button == null or not move_button.is_visible_in_tree():
@@ -106,11 +113,13 @@ func _update_run_notice(button_center: Vector2) -> void:
 	var direction: Vector2 = offset / distance
 
 	# 通知圆心 = 按钮圆心 + 方向 × 100（再往外）✓
+	#   三点共线验证：area_center → button_center → notice_center
+	#   都在同一条射线上（direction 相同，只差倍数）✓
 	var notice_center: Vector2 = button_center + direction * RUN_NOTICE_OFFSET_DIST
 
-	# GameRunNotice 是 0×0 的 Panel（图标靠锚点居中），
-	# 所以它的 global_position 就是"圆心" ✓
-	game_run_notice.global_position = notice_center
+	# ⚠️ global_position 是【左上角】✗ 不是圆心 ✗
+	#    必须减去半个尺寸，才是"以 panel 圆心对齐"✓
+	game_run_notice.global_position = notice_center - game_run_notice.size * 0.5
 
 	if not game_run_notice.visible:
 		game_run_notice.visible = true
