@@ -8,8 +8,17 @@ extends Control
 ## 触摸用 _input() 手动命中检测（Button 的 gui 信号在真机上不可靠 ✗
 ## 参考 drone_mode 的 Roll 按钮做法）。
 
+## GameRunNotice 出现的触发距离（MoveButton 圆心到 MoveStickArea 圆心的像素距离）
+const RUN_NOTICE_TRIGGER_DIST: float = 250.0
+
+## GameRunNotice 圆心到 MoveButton 圆心的距离
+const RUN_NOTICE_OFFSET_DIST: float = 100.0
+
 ## 静止时 MoveButton 在 MoveStickArea 里的位置（圆心对齐）
 var _rest_position: Vector2 = Vector2.ZERO
+
+## MoveStickArea 的圆心（全局坐标）
+var _area_center: Vector2 = Vector2.ZERO
 
 ## 当前是否有一根手指在拖动 MoveButton
 var _dragging: bool = false
@@ -19,6 +28,7 @@ var _drag_pointer_id: int = -1
 
 @onready var move_stick_area: Panel = $MoveStickArea
 @onready var move_button: Panel = $MoveStickArea/MoveButton
+@onready var game_run_notice: Panel = $GameRunNotice
 
 
 func _ready() -> void:
@@ -27,9 +37,16 @@ func _ready() -> void:
 
 	move_button.position = _rest_position
 
+	# MoveStickArea 的圆心（全局坐标）
+	_area_center = move_stick_area.get_global_rect().get_center()
+
+	# 通知图标初始隐藏（距离为 0 < 250）
+	if game_run_notice != null:
+		game_run_notice.visible = false
+
 	print(
 		"[GameMode] 就绪：MoveStickArea 圆心=",
-		move_stick_area.get_global_rect().get_center(),
+		_area_center,
 		" MoveButton 静止位置=",
 		_rest_position
 	)
@@ -54,6 +71,9 @@ func _set_button_center(global_center: Vector2) -> void:
 	# global_position = 圆心 - 半个尺寸
 	move_button.global_position = global_center - move_button.size * 0.5
 
+	# 每次移动都更新通知图标
+	_update_run_notice(global_center)
+
 
 ## 屏幕坐标是否落在 MoveButton 上
 func _is_move_button_hit(viewport_position: Vector2) -> bool:
@@ -63,11 +83,52 @@ func _is_move_button_hit(viewport_position: Vector2) -> bool:
 	return move_button.get_global_rect().has_point(viewport_position)
 
 
+## 按 MoveButton 当前位置更新 GameRunNotice 的显示与位置
+##
+## 触发：MoveButton 圆心到 MoveStickArea 圆心 > RUN_NOTICE_TRIGGER_DIST
+## 位置：沿「区域圆心 → 按钮圆心」方向的射线，按钮圆心再往外 RUN_NOTICE_OFFSET_DIST
+##       → d(区域, 通知) = d(区域, 按钮) + 100 > 100 = d(按钮, 通知) ✓
+func _update_run_notice(button_center: Vector2) -> void:
+	if game_run_notice == null:
+		return
+
+	var offset: Vector2 = button_center - _area_center
+	var distance: float = offset.length()
+
+	# 没超过触发距离 → 隐藏
+	if distance <= RUN_NOTICE_TRIGGER_DIST:
+		if game_run_notice.visible:
+			game_run_notice.visible = false
+			print("[GameMode] 距离 ", snappedf(distance, 0.1), " ≤ 250 → 隐藏 RunNotice")
+		return
+
+	# 方向退化（理论上不会，因为 distance > 250）
+	var direction: Vector2 = offset / distance
+
+	# 通知圆心 = 按钮圆心 + 方向 × 100（再往外）✓
+	var notice_center: Vector2 = button_center + direction * RUN_NOTICE_OFFSET_DIST
+
+	# GameRunNotice 是 0×0 的 Panel（图标靠锚点居中），
+	# 所以它的 global_position 就是"圆心" ✓
+	game_run_notice.global_position = notice_center
+
+	if not game_run_notice.visible:
+		game_run_notice.visible = true
+		print(
+			"[GameMode] 距离 ", snappedf(distance, 0.1), " > 250 → 显示 RunNotice",
+			" 圆心=", notice_center
+		)
+
+
 ## 手指抬起 / 触点丢失 → 回到静止位置
 func _reset_button() -> void:
 	_dragging = false
 	_drag_pointer_id = -1
 	move_button.position = _rest_position
+
+	# 回到圆心 → 距离为 0 → 隐藏通知
+	if game_run_notice != null:
+		game_run_notice.visible = false
 
 
 func _input(event: InputEvent) -> void:
