@@ -1,5 +1,66 @@
 [gd_scene format=3 uid="uid://bwlovg4gx3vyt"]
 
+[ext_resource type="Script" path="res://scripts/modes/game_mode.gd" id="1_gamemode"]
+[ext_resource type="Texture2D" uid="uid://bau7raq6bi1n7" path="res://resources/RunSpeedOne.svg" id="1_xgdm1"]
+[ext_resource type="Texture2D" uid="uid://eoi3igsa6ygr" path="res://resources/GameRotateOne.svg" id="2_ws2n2"]
+[ext_resource type="Texture2D" uid="uid://cmoylqhtfes0v" path="res://resources/RunShaking.svg" id="3_5jln4"]
+[ext_resource type="Texture2D" uid="uid://bre45xdgqj61v" path="res://resources/NoCarGround.svg" id="4_5jln4"]
+[ext_resource type="Texture2D" uid="uid://cs7au3408w56n" path="res://resources/GameRun.svg" id="5_dim6h"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_6t1vl"]
+bg_color = Color(0, 0, 0, 0.23529412)
+corner_radius_top_left = 60
+corner_radius_top_right = 60
+corner_radius_bottom_right = 60
+corner_radius_bottom_left = 60
+corner_detail = 20
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_qnk50"]
+bg_color = Color(0, 0, 0, 0.11764706)
+corner_radius_top_left = 125
+corner_radius_top_right = 125
+corner_radius_bottom_right = 125
+corner_radius_bottom_left = 125
+corner_detail = 20
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_sec1p"]
+bg_color = Color(1, 1, 1, 0.49019608)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0, 0.8, 1, 1)
+border_blend = true
+corner_radius_top_left = 36
+corner_radius_top_right = 36
+corner_radius_bottom_right = 36
+corner_radius_bottom_left = 36
+corner_detail = 20
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_a6nh6"]
+bg_color = Color(0, 0, 0, 0.627451)
+corner_radius_top_left = 60
+corner_radius_top_right = 60
+corner_radius_bottom_right = 60
+corner_radius_bottom_left = 60
+corner_detail = 20
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_gsaqu"]
+bg_color = Color(0, 0, 0, 0.627451)
+corner_radius_top_left = 60
+corner_radius_top_right = 60
+corner_radius_bottom_right = 60
+corner_radius_bottom_left = 60
+corner_detail = 20
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ycqn6"]
+bg_color = Color(0, 0, 0, 0.627451)
+corner_radius_top_left = 60
+corner_radius_top_right = 60
+corner_radius_bottom_right = 60
+corner_radius_bottom_left = 60
+corner_detail = 20
+
 [node name="GameMode" type="Control" unique_id=311837689]
 layout_mode = 3
 anchors_preset = 15
@@ -7,15 +68,117 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+script = ExtResource("1_gamemode")
 
-[node name="ColorRect" type="ColorRect" parent="." unique_id=1940311253]
+[node name="GameRunNotice" type="Panel" parent="." unique_id=810717534]
+visible = false
 layout_mode = 1
-anchors_preset = -1
-anchor_left = 0.25
-anchor_top = 0.25
-anchor_right = 0.75
-anchor_bottom = 0.75
+offset_left = -120.0
+offset_top = -120.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_6t1vl")
+
+[node name="GameRunIcon" type="TextureRect" parent="GameRunNotice" unique_id=28347423]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -60.0
+offset_top = -60.0
+offset_right = 60.0
+offset_bottom = 60.0
 grow_horizontal = 2
 grow_vertical = 2
-mouse_filter = 2
-color = Color(1, 1, 1, 0.4862745)
+texture = ExtResource("5_dim6h")
+
+[node name="MoveStickArea" type="Panel" parent="." unique_id=24477320]
+custom_minimum_size = Vector2(250, 250)
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 400.0
+offset_top = -420.0
+offset_right = 650.0
+offset_bottom = -170.0
+grow_vertical = 0
+theme_override_styles/panel = SubResource("StyleBoxFlat_qnk50")
+
+[node name="MoveButton" type="Panel" parent="MoveStickArea" unique_id=1142566699]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -36.0
+offset_top = -36.0
+offset_right = 36.0
+offset_bottom = 36.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_sec1p")
+
+[node name="RunSpeed" type="Button" parent="." unique_id=2028854496]
+custom_minimum_size = Vector2(120, 120)
+layout_mode = 0
+offset_left = 40.0
+offset_top = 200.0
+offset_right = 160.0
+offset_bottom = 320.0
+theme_override_styles/normal = SubResource("StyleBoxFlat_a6nh6")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_gsaqu")
+theme_override_styles/hover = SubResource("StyleBoxFlat_ycqn6")
+icon = ExtResource("1_xgdm1")
+
+[node name="GameRotate" type="Button" parent="." unique_id=419646011]
+custom_minimum_size = Vector2(120, 120)
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -160.0
+offset_top = 200.0
+offset_right = -40.0
+offset_bottom = 320.0
+grow_horizontal = 0
+theme_override_styles/normal = SubResource("StyleBoxFlat_a6nh6")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_gsaqu")
+theme_override_styles/hover = SubResource("StyleBoxFlat_ycqn6")
+icon = ExtResource("2_ws2n2")
+
+[node name="RunShaking" type="Button" parent="." unique_id=338487467]
+custom_minimum_size = Vector2(120, 120)
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -160.0
+offset_top = -160.0
+offset_right = -40.0
+offset_bottom = -40.0
+grow_horizontal = 0
+grow_vertical = 0
+theme_override_styles/normal = SubResource("StyleBoxFlat_a6nh6")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_gsaqu")
+theme_override_styles/hover = SubResource("StyleBoxFlat_ycqn6")
+icon = ExtResource("3_5jln4")
+
+[node name="SetGameGround" type="Button" parent="." unique_id=78350824]
+custom_minimum_size = Vector2(120, 120)
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 40.0
+offset_top = -160.0
+offset_right = 160.0
+offset_bottom = -40.0
+grow_vertical = 0
+theme_override_styles/normal = SubResource("StyleBoxFlat_a6nh6")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_gsaqu")
+theme_override_styles/hover = SubResource("StyleBoxFlat_ycqn6")
+icon = ExtResource("4_5jln4")

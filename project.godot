@@ -14,7 +14,7 @@ config/name="Blecaco"
 config/description="Blender Camera Controler: use your android phone to controal Blender's camera"
 run/main_scene="uid://cfh1jqoadil7e"
 config/features=PackedStringArray("4.7", "Mobile")
-boot_splash/bg_color=Color(0.14117648, 0.14117648, 1, 1)
+boot_splash/show_image=false
 boot_splash/stretch_mode=0
 config/icon="res://icon.svg"
 

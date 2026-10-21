@@ -27,7 +27,7 @@ const COVER_BG := Color(1.0, 1.0, 1.0, 1.0)
 const GLOW_SIZE := 48.0
 
 ## 光晕颜色 + 强度。alpha 就是强度，比如 0.4 = 更淡、1.0 = 最亮。
-const GLOW_COLOR := Color(0.0, 1.0, 0.0, 0.8)
+const GLOW_COLOR := Color("00ccffb4")
 
 
 ## 卡片样式盒：圆角白卡（不带光晕）。

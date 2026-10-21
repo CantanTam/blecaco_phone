@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="120"
+   height="120"
+   viewBox="0 0 31.749999 31.75"
+   version="1.1"
+   id="svg1"
+   inkscape:version="1.4.4 (dcaf3e7d9e, 2026-05-05)"
+   sodipodi:docname="GameRotateThree.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#171717"
+     bordercolor="#999999"
+     borderopacity="1"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0"
+     inkscape:pagecheckerboard="true"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="px"
+     inkscape:zoom="9.04"
+     inkscape:cx="67.588496"
+     inkscape:cy="64.103982"
+     inkscape:window-width="2560"
+     inkscape:window-height="1354"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg1" />
+  <defs
+     id="defs1" />
+  <path
+     id="path18"
+     style="baseline-shift:baseline;display:inline;overflow:visible;opacity:0.3;vector-effect:none;fill:#ffffff;stroke-linecap:round;stroke-linejoin:round;paint-order:markers fill stroke;enable-background:accumulate;stop-color:#000000"
+     d="M 15.875,4.1950927 A 1.5875,1.5875 0 0 0 14.286983,5.7831094 V 14.286983 H 5.7831094 A 1.5875,1.5875 0 0 0 4.1950927,15.875 1.5875,1.5875 0 0 0 5.7831094,17.463016 H 14.286983 V 25.96689 A 1.5875,1.5875 0 0 0 15.875,27.554907 1.5875,1.5875 0 0 0 17.463016,25.96689 V 17.463016 H 25.96689 A 1.5875,1.5875 0 0 0 27.554907,15.875 1.5875,1.5875 0 0 0 25.96689,14.286983 H 17.463016 V 5.7831094 A 1.5875,1.5875 0 0 0 15.875,4.1950927 Z"
+     inkscape:label="Notice" />
+  <path
+     id="path3"
+     style="display:inline;fill:#ffffff;stroke:none;stroke-width:2.43545;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none;paint-order:markers fill stroke"
+     d="m 15.875,4.1956095 a 1.5875,1.5875 0 0 0 -1.5875,1.5874999 1.5875,1.5875 0 0 0 1.5875,1.5875 1.5875,1.5875 0 0 0 1.5875,-1.5875 A 1.5875,1.5875 0 0 0 15.875,4.1956095 Z M 5.7831094,14.2875 a 1.5875,1.5875 0 0 0 -1.5874999,1.5875 1.5875,1.5875 0 0 0 1.5874999,1.5875 1.5875,1.5875 0 0 0 1.5875,-1.5875 1.5875,1.5875 0 0 0 -1.5875,-1.5875 z m 20.1837806,0 a 1.5875,1.5875 0 0 0 -1.5875,1.5875 1.5875,1.5875 0 0 0 1.5875,1.5875 1.5875,1.5875 0 0 0 1.5875,-1.5875 1.5875,1.5875 0 0 0 -1.5875,-1.5875 z M 15.875,24.37939 a 1.5875,1.5875 0 0 0 -1.5875,1.5875 1.5875,1.5875 0 0 0 1.5875,1.5875 1.5875,1.5875 0 0 0 1.5875,-1.5875 1.5875,1.5875 0 0 0 -1.5875,-1.5875 z"
+     inkscape:label="Level_3" />
+</svg>

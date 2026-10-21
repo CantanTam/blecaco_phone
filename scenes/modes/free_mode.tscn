@@ -36,9 +36,9 @@ script = ExtResource("4_ovins")
 [node name="PoseSourceButton" type="Button" parent="." unique_id=311837691]
 layout_mode = 1
 offset_left = 40.0
-offset_top = 240.0
+offset_top = 200.0
 offset_right = 160.0
-offset_bottom = 360.0
+offset_bottom = 320.0
 focus_mode = 0
 theme_override_styles/normal = SubResource("StyleBoxFlat_btn50")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_btn50")

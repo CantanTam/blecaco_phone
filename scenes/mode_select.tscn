@@ -11,7 +11,7 @@
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_coverglow"]
 shader = ExtResource("7_coverglow")
-shader_parameter/glow_color = Color(0, 1, 0, 0.7)
+shader_parameter/glow_color = Color(0, 1, 0, 0.627451)
 shader_parameter/glow_size = 28.0
 shader_parameter/corner_radius = 30.0
 shader_parameter/rect_size = Vector2(560, 720)
