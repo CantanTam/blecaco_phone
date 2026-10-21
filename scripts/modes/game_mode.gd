@@ -46,6 +46,9 @@ var _stick_vector: Vector2 = Vector2.ZERO
 ## RunSpeed 档位计数：每次点击 +1，图标由 RUN_SPEED % 3 决定
 var RUN_SPEED: int = 1
 
+## 是否为触摸设备（真机上触摸会产生【模拟鼠标事件】✗ 必须跳过 ✗）
+var _touch_platform: bool = false
+
 ## Blender 连接节点
 var connection_node: Node = null
 
@@ -79,6 +82,13 @@ func _ready() -> void:
 	# 通知图标初始隐藏（距离为 0 < 250）
 	if game_run_notice != null:
 		game_run_notice.visible = false
+
+	# 触摸设备检测：真机上触摸会同时产生 InputEventScreenTouch
+	# 和模拟的 InputEventMouseButton ✗ 不跳过会处理两次 ✗
+	_touch_platform = (
+		DisplayServer.is_touchscreen_available()
+		or OS.has_feature("mobile")
+	)
 
 	# RunSpeed：应用初始图标
 	if run_speed_button != null:
@@ -348,6 +358,10 @@ func _input(event: InputEvent) -> void:
 
 	# ── 电脑鼠标（真机上触摸会产生模拟鼠标事件，所以要跳过）──
 	if event is InputEventMouseButton:
+		# 真机上触摸会产生模拟鼠标事件 → 必须忽略，否则会处理两次 ✗
+		if _touch_platform:
+			return
+
 		var mouse := event as InputEventMouseButton
 
 		if mouse.button_index != MOUSE_BUTTON_LEFT:
@@ -370,6 +384,9 @@ func _input(event: InputEvent) -> void:
 		return
 
 	if event is InputEventMouseMotion:
+		if _touch_platform:
+			return
+
 		var motion := event as InputEventMouseMotion
 
 		if _dragging and _drag_pointer_id == -1:
