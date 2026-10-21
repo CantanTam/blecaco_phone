@@ -12,7 +12,8 @@ extends Control
 const RUN_NOTICE_TRIGGER_DIST: float = 250.0
 
 ## GameRunNotice 圆心到 MoveButton 圆心的距离
-const RUN_NOTICE_OFFSET_DIST: float = 100.0
+## 100px 时会被手指遮住 ✗ 改到 200px ✓
+const RUN_NOTICE_OFFSET_DIST: float = 200.0
 
 ## 静止时 MoveButton 在 MoveStickArea 里的位置（圆心对齐）
 var _rest_position: Vector2 = Vector2.ZERO
