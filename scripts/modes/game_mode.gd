@@ -83,12 +83,19 @@ func _control_center(control: Control) -> Vector2:
 	return control.global_position + control.size * 0.5
 
 
-## 屏幕坐标是否落在 MoveButton 上
-func _is_move_button_hit(viewport_position: Vector2) -> bool:
-	if move_button == null or not move_button.is_visible_in_tree():
+## 屏幕坐标是否落在 MoveStickArea 范围内（圆心为原点、半径 = 区域宽度的一半）
+## 之前是判断 MoveButton 范围 ✗ 只有 72×72 太小，很难点准 ✗
+func _is_stick_area_hit(viewport_position: Vector2) -> bool:
+	if move_stick_area == null or not move_stick_area.is_visible_in_tree():
 		return false
 
-	return move_button.get_global_rect().has_point(viewport_position)
+	# 用圆形范围（区域是正方形 Panel，视觉上是圆的）
+	var radius: float = minf(move_stick_area.size.x, move_stick_area.size.y) * 0.5
+
+	if radius <= 0.0:
+		return move_stick_area.get_global_rect().has_point(viewport_position)
+
+	return viewport_position.distance_to(_area_center) <= radius
 
 
 ## 按 MoveButton 当前位置更新 GameRunNotice 的显示与位置
@@ -150,7 +157,7 @@ func _input(event: InputEvent) -> void:
 				return
 
 			# 只有落在 MoveButton 内才开始拖动
-			if not _is_move_button_hit(touch.position):
+			if not _is_stick_area_hit(touch.position):
 				return
 
 			_dragging = true
@@ -186,7 +193,7 @@ func _input(event: InputEvent) -> void:
 			return
 
 		if mouse.pressed:
-			if _dragging or not _is_move_button_hit(mouse.position):
+			if _dragging or not _is_stick_area_hit(mouse.position):
 				return
 
 			_dragging = true

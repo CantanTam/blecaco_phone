@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://bwlovg4gx3vyt"]
 
-[ext_resource type="Script" path="res://scripts/modes/game_mode.gd" id="1_gamemode"]
+[ext_resource type="Script" uid="uid://bpho6cqpbwcft" path="res://scripts/modes/game_mode.gd" id="1_gamemode"]
 [ext_resource type="Texture2D" uid="uid://bau7raq6bi1n7" path="res://resources/RunSpeedOne.svg" id="1_xgdm1"]
 [ext_resource type="Texture2D" uid="uid://eoi3igsa6ygr" path="res://resources/GameRotateOne.svg" id="2_ws2n2"]
 [ext_resource type="Texture2D" uid="uid://cmoylqhtfes0v" path="res://resources/RunShaking.svg" id="3_5jln4"]
@@ -98,9 +98,9 @@ layout_mode = 1
 anchors_preset = 2
 anchor_top = 1.0
 anchor_bottom = 1.0
-offset_left = 400.0
+offset_left = 500.0
 offset_top = -420.0
-offset_right = 650.0
+offset_right = 750.0
 offset_bottom = -170.0
 grow_vertical = 0
 theme_override_styles/panel = SubResource("StyleBoxFlat_qnk50")
