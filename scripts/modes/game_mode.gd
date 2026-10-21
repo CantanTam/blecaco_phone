@@ -11,6 +11,13 @@ extends Control
 ## 摇杆归一化半径（位移 / 此值 = -1..1）
 const STICK_LIMIT_RADIUS: float = 250.0
 
+## RunSpeed 三档图标
+const ICON_RUN_SPEED := {
+	1: "res://resources/RunSpeedOne.svg",
+	2: "res://resources/RunSpeedTwo.svg",
+	3: "res://resources/RunSpeedThree.svg",
+}
+
 ## 发送频率（Hz）
 const SEND_HZ: float = 60.0
 
@@ -33,6 +40,12 @@ var _area_center: Vector2 = Vector2.ZERO
 ## 摇杆归一化向量（x 右为正 / y 下为正，长度 ≤ 1）
 var _stick_vector: Vector2 = Vector2.ZERO
 
+## RunSpeed 档位（1 / 2 / 3，循环）
+var RUN_SPEED: int = 1
+
+## 三档图标的纹理缓存
+var _run_speed_icons: Dictionary = {}
+
 ## Blender 连接节点
 var connection_node: Node = null
 
@@ -51,6 +64,7 @@ var _drag_pointer_id: int = -1
 @onready var move_stick_area: Panel = $MoveStickArea
 @onready var move_button: Panel = $MoveStickArea/MoveButton
 @onready var game_run_notice: Panel = $GameRunNotice
+@onready var run_speed_button: Button = $RunSpeed
 
 
 func _ready() -> void:
@@ -66,6 +80,16 @@ func _ready() -> void:
 	if game_run_notice != null:
 		game_run_notice.visible = false
 
+	# RunSpeed：加载三档图标 + 应用初始档位
+	_load_run_speed_icons()
+	_apply_run_speed_icon()
+
+	# ⚠️ 不用 Button 的 pressed 信号：真机上不可靠 ✗
+	#    改用 _input() 手动命中检测（和 MoveButton 同一套）
+	if run_speed_button != null:
+		run_speed_button.focus_mode = Control.FOCUS_NONE
+		run_speed_button.expand_icon = true
+
 	# 找 Blender 连接节点
 	connection_node = get_tree().root.find_child(CONNECTION_NODE_NAME, true, false)
 
@@ -77,6 +101,51 @@ func _ready() -> void:
 		" Connection=",
 		connection_node != null
 	)
+
+
+## 预加载三档图标
+func _load_run_speed_icons() -> void:
+	for level in ICON_RUN_SPEED.keys():
+		var path: String = ICON_RUN_SPEED[level]
+
+		if ResourceLoader.exists(path):
+			_run_speed_icons[level] = load(path)
+		else:
+			print("[GameMode] RunSpeed 图标缺失：", path)
+
+
+## 按当前 RUN_SPEED 更新按钮图标
+func _apply_run_speed_icon() -> void:
+	if run_speed_button == null:
+		return
+
+	var texture: Variant = _run_speed_icons.get(RUN_SPEED)
+
+	if texture == null:
+		return
+
+	run_speed_button.icon = texture
+	run_speed_button.expand_icon = true
+
+
+## RunSpeed 被点击：档位 +1，超过 3 就回到 1
+func _cycle_run_speed() -> void:
+	RUN_SPEED += 1
+
+	if RUN_SPEED > 3:
+		RUN_SPEED = 1
+
+	_apply_run_speed_icon()
+
+	print("[GameMode] RUN_SPEED = ", RUN_SPEED)
+
+
+## 屏幕坐标是否落在 RunSpeed 按钮上
+func _is_run_speed_hit(viewport_position: Vector2) -> bool:
+	if run_speed_button == null or not run_speed_button.is_visible_in_tree():
+		return false
+
+	return run_speed_button.get_global_rect().has_point(viewport_position)
 
 
 ## 计算 MoveButton 的静止位置（让它圆心对齐 MoveStickArea 圆心）
@@ -253,6 +322,11 @@ func _input(event: InputEvent) -> void:
 		var touch := event as InputEventScreenTouch
 
 		if touch.pressed:
+			# RunSpeed 优先（它在摇杆区域之外，不会冲突）
+			if _is_run_speed_hit(touch.position):
+				_cycle_run_speed()
+				return
+
 			if _dragging:
 				return
 
@@ -293,6 +367,10 @@ func _input(event: InputEvent) -> void:
 			return
 
 		if mouse.pressed:
+			if _is_run_speed_hit(mouse.position):
+				_cycle_run_speed()
+				return
+
 			if _dragging or not _is_stick_area_hit(mouse.position):
 				return
 
