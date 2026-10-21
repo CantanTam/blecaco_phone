@@ -11,6 +11,23 @@ extends Control
 ## 摇杆归一化半径（位移 / 此值 = -1..1）
 const STICK_LIMIT_RADIUS: float = 250.0
 
+## 分档倍率（只作用于【冲刺】速度，行走速度不受影响 ✓）
+##   RUN_SPEED % 3 == 1 → 1.10x
+##   RUN_SPEED % 3 == 2 → 1.20x
+##   RUN_SPEED % 3 == 0 → 1.30x
+const RUN_SPEED_MULTIPLIERS := {
+	1: 1.10,
+	2: 1.20,
+	0: 1.30,
+}
+
+## 冲刺触发/退出距离（迟滞 20px，防止边界抖动 ✗）
+const RUN_TRIGGER_DIST: float = 250.0
+const RUN_RELEASE_DIST: float = 230.0
+
+## 倍率过渡时间常数（150ms，避免"突然被推一把"✗）
+const RUN_TRANSITION_TAU: float = 0.15
+
 ## RunSpeed 图标映射：key = RUN_SPEED % 3 的结果
 ##   RUN_SPEED % 3 == 1 → One
 ##   RUN_SPEED % 3 == 2 → Two
@@ -48,6 +65,12 @@ var RUN_SPEED: int = 1
 
 ## 是否为触摸设备（真机上触摸会产生【模拟鼠标事件】✗ 必须跳过 ✗）
 var _touch_platform: bool = false
+
+## 是否处于冲刺状态（带迟滞 ✓）
+var _sprinting: bool = false
+
+## 当前倍率（150ms lerp 过渡中）
+var _sprint_multiplier: float = 1.0
 
 ## Blender 连接节点
 var connection_node: Node = null
@@ -108,6 +131,25 @@ func _ready() -> void:
 		" Connection=",
 		connection_node != null
 	)
+
+
+## 当前档位对应的冲刺倍率
+func _run_speed_multiplier() -> float:
+	var key: int = RUN_SPEED % 3
+	return float(RUN_SPEED_MULTIPLIERS.get(key, 1.0))
+
+
+## 按距离 + 迟滞更新冲刺状态
+##   距离 > 250 → 进入冲刺 ✓
+##   距离 < 230 → 退出冲刺 ✓
+##   230~250 之间 → 保持当前状态 ✓（防抖动）
+func _update_sprint_state(distance: float) -> void:
+	if not _sprinting and distance > RUN_TRIGGER_DIST:
+		_sprinting = true
+		print("[GameMode] 进入冲刺 distance=%.1f" % distance)
+	elif _sprinting and distance < RUN_RELEASE_DIST:
+		_sprinting = false
+		print("[GameMode] 退出冲刺 distance=%.1f" % distance)
 
 
 ## 按 RUN_SPEED % 3 更新图标
@@ -223,11 +265,13 @@ func _update_run_notice(button_center: Vector2) -> void:
 	var offset: Vector2 = button_center - _area_center
 	var distance: float = offset.length()
 
-	# 没超过触发距离 → 隐藏
-	if distance <= RUN_NOTICE_TRIGGER_DIST:
+	# 先按迟滞更新冲刺状态
+	_update_sprint_state(distance)
+
+	# 没进入冲刺 → 隐藏
+	if not _sprinting:
 		if game_run_notice.visible:
 			game_run_notice.visible = false
-			print("[GameMode] 距离 ", snappedf(distance, 0.1), " ≤ 250 → 隐藏 RunNotice")
 		return
 
 	# 方向退化（理论上不会，因为 distance > 250）
@@ -244,10 +288,6 @@ func _update_run_notice(button_center: Vector2) -> void:
 
 	if not game_run_notice.visible:
 		game_run_notice.visible = true
-		print(
-			"[GameMode] 距离 ", snappedf(distance, 0.1), " > 250 → 显示 RunNotice",
-			" 圆心=", notice_center
-		)
 
 
 ## 手指抬起 / 触点丢失 → 回到静止位置
@@ -256,8 +296,9 @@ func _reset_button() -> void:
 	_drag_pointer_id = -1
 	move_button.position = _rest_position
 
-	# 回到圆心 → 摇杆归零 + 隐藏通知
+	# 回到圆心 → 摇杆归零 + 退出冲刺 + 隐藏通知
 	_stick_vector = Vector2.ZERO
+	_sprinting = false
 
 	if game_run_notice != null:
 		game_run_notice.visible = false
@@ -304,12 +345,19 @@ func _process(delta: float) -> void:
 
 	_send_timer = 0.0
 
+	# 倍率平滑过渡（150ms）
+	var target_multiplier: float = _run_speed_multiplier() if _sprinting else 1.0
+	var k: float = 1.0 - exp(-delta / maxf(RUN_TRANSITION_TAU, 1e-4))
+	_sprint_multiplier = lerpf(_sprint_multiplier, target_multiplier, k)
+
 	connection_node.call(
 		"send_action",
 		"game",
 		{
 			"rx": _stick_vector.x,
 			"ry": _stick_vector.y,
+			"sprint": _sprinting,
+			"run_multiplier": _sprint_multiplier,
 		}
 	)
 
