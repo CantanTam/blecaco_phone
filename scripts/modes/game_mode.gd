@@ -8,6 +8,15 @@ extends Control
 ## 触摸用 _input() 手动命中检测（Button 的 gui 信号在真机上不可靠 ✗
 ## 参考 drone_mode 的 Roll 按钮做法）。
 
+## 摇杆归一化半径（位移 / 此值 = -1..1）
+const STICK_LIMIT_RADIUS: float = 250.0
+
+## 发送频率（Hz）
+const SEND_HZ: float = 60.0
+
+## Blender 连接节点名
+const CONNECTION_NODE_NAME: String = "Connection"
+
 ## GameRunNotice 出现的触发距离（MoveButton 圆心到 MoveStickArea 圆心的像素距离）
 const RUN_NOTICE_TRIGGER_DIST: float = 250.0
 
@@ -20,6 +29,18 @@ var _rest_position: Vector2 = Vector2.ZERO
 
 ## MoveStickArea 的圆心（全局坐标）
 var _area_center: Vector2 = Vector2.ZERO
+
+## 摇杆归一化向量（x 右为正 / y 下为正，长度 ≤ 1）
+var _stick_vector: Vector2 = Vector2.ZERO
+
+## Blender 连接节点
+var connection_node: Node = null
+
+## 是否已初始化
+var game_initialized: bool = false
+
+## 发送计时
+var _send_timer: float = 0.0
 
 ## 当前是否有一根手指在拖动 MoveButton
 var _dragging: bool = false
@@ -45,11 +66,16 @@ func _ready() -> void:
 	if game_run_notice != null:
 		game_run_notice.visible = false
 
+	# 找 Blender 连接节点
+	connection_node = get_tree().root.find_child(CONNECTION_NODE_NAME, true, false)
+
 	print(
 		"[GameMode] 就绪：MoveStickArea 圆心=",
 		_area_center,
 		" MoveButton 静止位置=",
-		_rest_position
+		_rest_position,
+		" Connection=",
+		connection_node != null
 	)
 
 
@@ -71,6 +97,9 @@ func _set_button_center(global_center: Vector2) -> void:
 
 	# global_position = 圆心 - 半个尺寸
 	move_button.global_position = global_center - move_button.size * 0.5
+
+	# 更新摇杆向量（发给 Blender 驱动机位移动）
+	_update_stick_vector(global_center)
 
 	# 每次移动都更新通知图标
 	_update_run_notice(global_center)
@@ -96,6 +125,24 @@ func _is_stick_area_hit(viewport_position: Vector2) -> bool:
 		return move_stick_area.get_global_rect().has_point(viewport_position)
 
 	return viewport_position.distance_to(_area_center) <= radius
+
+
+## 计算摇杆归一化向量
+##   x：右为正（屏幕坐标）
+##   y：下为正（屏幕坐标）
+##   长度 ≤ 1（超出上限就钳制，方向保留）
+func _update_stick_vector(button_center: Vector2) -> void:
+	var offset: Vector2 = button_center - _area_center
+	var distance: float = offset.length()
+
+	if distance < 1e-5:
+		_stick_vector = Vector2.ZERO
+		return
+
+	var normalized: Vector2 = offset / distance
+	var magnitude: float = minf(distance / STICK_LIMIT_RADIUS, 1.0)
+
+	_stick_vector = normalized * magnitude
 
 
 ## 按 MoveButton 当前位置更新 GameRunNotice 的显示与位置
@@ -143,9 +190,62 @@ func _reset_button() -> void:
 	_drag_pointer_id = -1
 	move_button.position = _rest_position
 
-	# 回到圆心 → 距离为 0 → 隐藏通知
+	# 回到圆心 → 摇杆归零 + 隐藏通知
+	_stick_vector = Vector2.ZERO
+
 	if game_run_notice != null:
 		game_run_notice.visible = false
+
+
+## 按固定频率把摇杆向量发给 Blender
+func _process(delta: float) -> void:
+	if connection_node == null or not is_instance_valid(connection_node):
+		return
+
+	if not connection_node.has_method("send_action"):
+		return
+
+	# 先发一次 initialize（Blender 记录时间基准）
+	if not game_initialized:
+		_send_timer += delta
+
+		if _send_timer < 0.5:
+			return
+
+		_send_timer = 0.0
+
+		var sent: bool = bool(
+			connection_node.call(
+				"send_action",
+				"game",
+				{"command": "initialize"}
+			)
+		)
+
+		if sent:
+			game_initialized = true
+			print("[GameMode] Blender game control initialized")
+
+		return
+
+	# 按频率发送摇杆向量
+	_send_timer += delta
+
+	var interval: float = 1.0 / maxf(SEND_HZ, 1.0)
+
+	if _send_timer < interval:
+		return
+
+	_send_timer = 0.0
+
+	connection_node.call(
+		"send_action",
+		"game",
+		{
+			"rx": _stick_vector.x,
+			"ry": _stick_vector.y,
+		}
+	)
 
 
 func _input(event: InputEvent) -> void:
