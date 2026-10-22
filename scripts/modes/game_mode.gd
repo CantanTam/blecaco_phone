@@ -52,6 +52,10 @@ const ICON_ROTATE_SPEED := {
 const ICON_RUN_SHAKING_ON: String = "res://resources/RunShaking.svg"
 const ICON_RUN_SHAKING_OFF: String = "res://resources/NoRunShaking.svg"
 
+## ── WallCollision 开关图标 ────────────────────────────
+const ICON_WALL_COLLISION_ON: String = "res://resources/WallCollision.svg"
+const ICON_WALL_COLLISION_OFF: String = "res://resources/NoWallCollision.svg"
+
 ## 摇杆归一化半径（位移 / 此值 = -1..1）
 const STICK_LIMIT_RADIUS: float = 250.0
 
@@ -112,6 +116,9 @@ var ROTATE_SPEED: int = 2
 
 ## 奔跑抖动开关（默认开）
 var RUN_SHAKING: bool = true
+
+## 相机防撞开关（默认开）
+var WALL_COLLISION: bool = true
 
 ## Blender 推来的脚下状态（与 car_mode 同款 ✓）
 func _on_ground_indicator_message(message: String) -> void:
@@ -191,6 +198,7 @@ var _drag_pointer_id: int = -1
 @onready var run_speed_button: Button = $RunSpeed
 @onready var game_rotate_button: Button = $GameRotate
 @onready var run_shaking_button: Button = $RunShaking
+@onready var wall_collision_button: Button = get_node_or_null("WallCollision")
 @onready var set_body_height_button: Button = $SetBodyHeight
 
 
@@ -233,6 +241,12 @@ func _ready() -> void:
 		run_shaking_button.expand_icon = true
 		_apply_run_shaking_icon()
 
+	# WallCollision：开关图标（按钮不存在时自动跳过 ✓）
+	if wall_collision_button != null:
+		wall_collision_button.focus_mode = Control.FOCUS_NONE
+		wall_collision_button.expand_icon = true
+		_apply_wall_collision_icon()
+
 	# SetBodyHeight：复制专属样式 + 记录原位 + 初始图标
 	if set_body_height_button != null:
 		set_body_height_button.focus_mode = Control.FOCUS_NONE
@@ -272,6 +286,35 @@ func _ready() -> void:
 		" Connection=",
 		connection_node != null
 	)
+
+
+## 按 WALL_COLLISION 更新图标
+func _apply_wall_collision_icon() -> void:
+	if wall_collision_button == null:
+		return
+
+	var path: String = ICON_WALL_COLLISION_ON if WALL_COLLISION else ICON_WALL_COLLISION_OFF
+
+	if not ResourceLoader.exists(path):
+		print("[GameMode] WallCollision 图标缺失：", path)
+		return
+
+	wall_collision_button.icon = load(path)
+	wall_collision_button.expand_icon = true
+
+
+## WallCollision 被点击：取反
+func _toggle_wall_collision() -> void:
+	WALL_COLLISION = not WALL_COLLISION
+	_apply_wall_collision_icon()
+	print("[GameMode] WALL_COLLISION = ", WALL_COLLISION)
+
+
+## 屏幕坐标是否落在 WallCollision 上
+func _is_wall_collision_hit(viewport_position: Vector2) -> bool:
+	if wall_collision_button == null or not wall_collision_button.is_visible_in_tree():
+		return false
+	return wall_collision_button.get_global_rect().has_point(viewport_position)
 
 
 ## 按 RUN_SHAKING 更新图标
@@ -838,6 +881,7 @@ func _process(delta: float) -> void:
 			"look_dy": send_dy,
 			"look_multiplier": _rotate_speed_multiplier(),
 			"run_shaking": RUN_SHAKING,
+			"wall_collision": WALL_COLLISION,
 		}
 	)
 
@@ -860,6 +904,11 @@ func _input(event: InputEvent) -> void:
 			# RunShaking：开关
 			if _is_run_shaking_hit(touch.position):
 				_toggle_run_shaking()
+				return
+
+			# WallCollision：开关
+			if _is_wall_collision_hit(touch.position):
+				_toggle_wall_collision()
 				return
 
 			# SetBodyHeight 按下 → 开始长按计时

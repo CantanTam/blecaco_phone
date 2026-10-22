@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cignfiy73li2c"
-path="res://.godot/imported/NoGameCollision.svg-b2248778ce63a2a0d4af185fe881f3a1.ctex"
+uid="uid://bpoqy2bx7d7qk"
+path="res://.godot/imported/WallCollision.svg-0aa4deba1dd358e1d0de936c6e3b213e.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://resources/NoGameCollision.svg"
-dest_files=["res://.godot/imported/NoGameCollision.svg-b2248778ce63a2a0d4af185fe881f3a1.ctex"]
+source_file="res://resources/WallCollision.svg"
+dest_files=["res://.godot/imported/WallCollision.svg-0aa4deba1dd358e1d0de936c6e3b213e.ctex"]
 
 [params]
 
