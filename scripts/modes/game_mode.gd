@@ -84,17 +84,9 @@ func _on_ground_indicator_message(message: String) -> void:
 	if data.get("type") != "ground_indicator":
 		return
 
+	# 只取 has_surface（长按前置条件 ✓）
+	# ⚠️ 不用它改 HAS_GAME_GROUND ✗ 那是"开关状态"，只能由用户长按切换 ✓
 	_gg_has_surface = bool(data.get("has_surface", false))
-
-	# 图标 + 闪色跟随脚下状态 ✓
-	var has_ground: bool = bool(data.get("has_ground", false))
-
-	if has_ground == HAS_GAME_GROUND:
-		return
-
-	HAS_GAME_GROUND = has_ground
-	_apply_body_height_icon()
-	_play_body_height_flash()
 
 
 ## 地面人物高度开关
