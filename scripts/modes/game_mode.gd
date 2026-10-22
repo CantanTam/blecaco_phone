@@ -299,17 +299,31 @@ func _should_start_look(viewport_position: Vector2) -> bool:
 	if viewport_position.x < get_viewport_rect().size.x * 0.5:
 		return false
 
-	# 排除其他按钮
+	# 排除其他按钮（game_mode 的：GameRotate / RunShaking / RunSpeed / SetBodyHeight / 摇杆）
+	if _is_any_ui_button_hit(viewport_position):
+		return false
+
 	if _is_run_speed_hit(viewport_position):
 		return false
 	if _is_body_height_hit(viewport_position):
-		return false
-	if _is_in_forward_area(viewport_position):
 		return false
 	if _is_stick_area_hit(viewport_position):
 		return false
 
 	return true
+
+
+## 落点是否落在任何具名 UI 按钮上（这些按钮不触发视角控制）
+func _is_any_ui_button_hit(viewport_position: Vector2) -> bool:
+	var names: Array = ["GameRotate", "RunShaking", "RunSpeed", "SetBodyHeight"]
+
+	for n in names:
+		var node: Node = get_node_or_null(n)
+		if node is Control and (node as Control).is_visible_in_tree():
+			if (node as Control).get_global_rect().has_point(viewport_position):
+				return true
+
+	return false
 
 
 ## 是否横屏（宽 > 高）
