@@ -336,6 +336,11 @@ func _move_set_ground_to(global_pos: Vector2) -> void:
 	if not _sg_dragging:
 		return
 
+	# ★ 拖动中开始前进 → 取消拖动（弹回，不切换）✓
+	if _is_forward_pressed():
+		_cancel_drag()
+		return
+
 	set_ground_button.global_position = global_pos - _sg_grab_offset
 
 	# ⚠️ 这里【不触发】✗ 只在松手时判定（见 _on_set_ground_button_up）
@@ -465,6 +470,14 @@ func _on_set_ground_button_up() -> void:
 ## 长按计时：达到 SET_GROUND_HOLD_SEC 就切换 HAS_GROUND
 func _tick_set_ground_hold(delta: float) -> void:
 	if not _set_ground_holding:
+		return
+
+	# ★ CarForwardArea 被按下 → SetGround 暂时失效 ✓
+	#   正在长按计时也立即中止（不会进入拖动、不会切换 is_ground）
+	if _is_forward_pressed():
+		_set_ground_holding = false
+		_set_ground_hold_time = 0.0
+		print("[CarMode] 前进中 → SetGround 长按中止")
 		return
 
 	_set_ground_hold_time += delta
@@ -833,6 +846,11 @@ func _input(event: InputEvent) -> void:
 		_sg_last_pos = sd.position
 
 		if _sg_dragging:
+			# CarForwardArea 被按下 → SetGround 失效，取消拖动 ✓
+			if _is_forward_pressed():
+				_cancel_drag()
+				return
+
 			# 照搬 MoveButton：圆心 = 手指 ✓
 			set_ground_button.global_position = sd.position - set_ground_button.size * 0.5
 
