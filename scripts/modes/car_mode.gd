@@ -757,6 +757,11 @@ func _input(event: InputEvent) -> void:
 			_move_set_ground_to((event as InputEventScreenDrag).position)
 		return
 
+	if event is InputEventMouseMotion:
+		if _sg_dragging and not _touch_platform:
+			_move_set_ground_to((event as InputEventMouseMotion).position)
+		return
+
 		if event.pressed and _is_zoom_fit_hit(event.position):
 			_toggle_zoom_fit()
 			get_viewport().set_input_as_handled()
@@ -778,12 +783,12 @@ func _input(event: InputEvent) -> void:
 
 		# 鼠标松开：结束 SetGround 长按
 		if not event.pressed:
-			if _set_ground_holding:
+			if _set_ground_holding or _sg_dragging:
 				_on_set_ground_button_up()
 			return
 
 		if _is_set_ground_hit(event.position):
-			_on_set_ground_button_down()
+			_on_set_ground_button_down(event.position)
 			get_viewport().set_input_as_handled()
 			return
 
