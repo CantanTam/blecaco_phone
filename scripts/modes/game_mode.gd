@@ -32,6 +32,22 @@ var _look_vector: Vector2 = Vector2.ZERO      # 已废弃（保留兼容）
 var _look_delta: Vector2 = Vector2.ZERO
 var _look_last_pos: Vector2 = Vector2.ZERO      # x 右为正 / y 下为正，长度 ≤ 1
 
+## ── 视角灵敏度分档（GameRotate 按钮切换）────────────
+##   ROTATE_SPEED % 3 == 1 → 低 / 2 → 中 / 0 → 高
+##   倍率作用在 Blender 的 GAME_LOOK_*_DEG_PER_PX 上 ✓
+const ROTATE_SPEED_MULTIPLIERS := {
+	1: 0.67,     # 低：滑满一屏 ≈ 154°（精细瞄准）
+	2: 1.00,     # 中：滑满一屏 ≈ 230°（业界默认 ✓）
+	0: 1.50,     # 高：滑满一屏 ≈ 346°（快速转身）
+}
+
+## GameRotate 三档图标
+const ICON_ROTATE_SPEED := {
+	1: "res://resources/GameRotateOne.svg",
+	2: "res://resources/GameRotateTwo.svg",
+	0: "res://resources/GameRotateThree.svg",
+}
+
 ## 摇杆归一化半径（位移 / 此值 = -1..1）
 const STICK_LIMIT_RADIUS: float = 250.0
 
@@ -86,6 +102,9 @@ var _stick_vector: Vector2 = Vector2.ZERO
 
 ## RunSpeed 档位计数：每次点击 +1，图标由 RUN_SPEED % 3 决定
 var RUN_SPEED: int = 1
+
+## 视角灵敏度档位计数（每次点击 +1，图标由 % 3 决定）
+var ROTATE_SPEED: int = 2
 
 ## Blender 推来的脚下状态（与 car_mode 同款 ✓）
 func _on_ground_indicator_message(message: String) -> void:
@@ -163,6 +182,7 @@ var _drag_pointer_id: int = -1
 @onready var move_button: Panel = $MoveStickArea/MoveButton
 @onready var game_run_notice: Panel = $GameRunNotice
 @onready var run_speed_button: Button = $RunSpeed
+@onready var game_rotate_button: Button = $GameRotate
 @onready var set_body_height_button: Button = $SetBodyHeight
 
 
@@ -192,6 +212,12 @@ func _ready() -> void:
 		run_speed_button.expand_icon = true
 
 	_apply_run_speed_icon()
+
+	# GameRotate：视角灵敏度
+	if game_rotate_button != null:
+		game_rotate_button.focus_mode = Control.FOCUS_NONE
+		game_rotate_button.expand_icon = true
+		_apply_rotate_speed_icon()
 
 	# SetBodyHeight：复制专属样式 + 记录原位 + 初始图标
 	if set_body_height_button != null:
@@ -232,6 +258,40 @@ func _ready() -> void:
 		" Connection=",
 		connection_node != null
 	)
+
+
+## 按 ROTATE_SPEED % 3 更新灵敏度图标
+func _apply_rotate_speed_icon() -> void:
+	if game_rotate_button == null:
+		return
+
+	var path: String = ICON_ROTATE_SPEED.get(ROTATE_SPEED % 3, "")
+
+	if path.is_empty() or not ResourceLoader.exists(path):
+		return
+
+	game_rotate_button.icon = load(path)
+	game_rotate_button.expand_icon = true
+
+
+## 当前灵敏度倍率
+func _rotate_speed_multiplier() -> float:
+	return float(ROTATE_SPEED_MULTIPLIERS.get(ROTATE_SPEED % 3, 1.0))
+
+
+## GameRotate 被点击：档位 +1
+func _cycle_rotate_speed() -> void:
+	ROTATE_SPEED += 1
+	_apply_rotate_speed_icon()
+	print("[GameMode] ROTATE_SPEED = ", ROTATE_SPEED,
+		" (mod 3 = ", ROTATE_SPEED % 3, "，倍率 = ", _rotate_speed_multiplier(), ")")
+
+
+## 屏幕坐标是否落在 GameRotate 上
+func _is_game_rotate_hit(viewport_position: Vector2) -> bool:
+	if game_rotate_button == null or not game_rotate_button.is_visible_in_tree():
+		return false
+	return game_rotate_button.get_global_rect().has_point(viewport_position)
 
 
 ## 当前档位对应的冲刺倍率
@@ -735,6 +795,7 @@ func _process(delta: float) -> void:
 			"run_multiplier": _sprint_multiplier,
 			"look_dx": send_dx,
 			"look_dy": send_dy,
+			"look_multiplier": _rotate_speed_multiplier(),
 		}
 	)
 
@@ -747,6 +808,11 @@ func _input(event: InputEvent) -> void:
 			# RunSpeed 优先（它在摇杆区域之外，不会冲突）
 			if _is_run_speed_hit(touch.position):
 				_cycle_run_speed()
+				return
+
+			# GameRotate：切视角灵敏度
+			if _is_game_rotate_hit(touch.position):
+				_cycle_rotate_speed()
 				return
 
 			# SetBodyHeight 按下 → 开始长按计时
