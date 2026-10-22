@@ -225,15 +225,39 @@ var car_mode_initialized: bool = false
 
 
 ## CarForwardArea 当前是否被按下（用于禁止移动中拖动 SetGround ✓）
+## 前进区域被按下的触点集合（自己记录 ✗ 不依赖 forward_speed ✗）
+## 原因：第二根手指按下 SetGround 时，forward_speed 可能瞬间归零 ✗
+var _forward_pointers: Dictionary = {}
+
+var _forward_rect_cached: Rect2 = Rect2()
+
+
 func _is_forward_pressed() -> bool:
+	# 自己记的触点优先 ✓
+	if not _forward_pointers.is_empty():
+		return true
+
+	# 兜底：看 forward_speed
 	if forward_area == null:
 		return false
 
 	var v: Variant = forward_area.get("forward_speed")
+
 	if v == null:
 		return false
 
 	return absf(float(v)) > 0.01
+
+
+## 屏幕点是否在前进区域内（用节点矩形 ✓）
+func _is_in_forward_area(viewport_position: Vector2) -> bool:
+	if forward_area == null:
+		return false
+
+	if not (forward_area is Control):
+		return false
+
+	return (forward_area as Control).get_global_rect().has_point(viewport_position)
 
 
 ## 屏幕坐标是否落在 SetGround 按钮上
@@ -814,6 +838,16 @@ func _is_zoom_fit_hit(viewport_position: Vector2) -> bool:
 
 ## 触摸/鼠标输入：命中 ZoomFit 就切换（用矩形命中，不用 Button.pressed）
 func _input(event: InputEvent) -> void:
+	# 先维护"前进区域触点"集合（必须最先执行 ✓ 不能被别的分支挡住 ✗）
+	if event is InputEventScreenTouch:
+		var t := event as InputEventScreenTouch
+
+		if t.pressed:
+			if _is_in_forward_area(t.position):
+				_forward_pointers[t.index] = true
+		else:
+			_forward_pointers.erase(t.index)
+
 	if event is InputEventScreenTouch:
 		# SetGround：按下开始计时，抬起结束（手动命中检测，真机可靠 ✓）
 		if event.pressed and _is_set_ground_hit(event.position):
