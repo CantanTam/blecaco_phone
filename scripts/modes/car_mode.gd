@@ -95,8 +95,35 @@ const ICON_NO_GROUND: String = "res://resources/NoCarGround.svg"
 const ICON_HAS_GROUND: String = "res://resources/HasCarGround.svg"
 const SET_GROUND_HOLD_SEC: float = 2.0
 
+# ── SetGround 拖动切换 ──────────────────────────────────
+## 长按成功后进入拖动状态，拖满这个距离才切换（防误触 ✓）
+const SET_GROUND_DRAG_DIST: float = 300.0
+## 弹回原位的时长
+const SET_GROUND_SNAP_SEC: float = 0.15
+## 颜色反馈：透明 → 彩色（0.12s）→ 保持（0.10s）→ 透明（0.22s）→ 直接回常态
+const SET_GROUND_FLASH_IN: float = 0.12
+const SET_GROUND_FLASH_HOLD: float = 0.10
+const SET_GROUND_FLASH_OUT: float = 0.22
+## HAS_GROUND = true 时闪绿色
+const COLOR_HAS_GROUND := Color("00d455ff")
+## HAS_GROUND = false 时闪红色
+const COLOR_NO_GROUND := Color("ff5555ff")
+## 常态背景色
+const COLOR_SET_GROUND_NORMAL := Color("000000a0")
+
 # 是否启用地面追踪（默认关闭）
 var HAS_GROUND: bool = false
+
+## 是否处于拖动状态（长按满 2 秒后进入）
+var _sg_dragging: bool = false
+## 按下点相对按钮左上角的偏移（保证拖动不跳位）
+var _sg_grab_offset: Vector2 = Vector2.ZERO
+## 按钮的固定位置（拖动前记录）
+var _sg_rest_position: Vector2 = Vector2.ZERO
+## 按钮专属的 StyleBoxFlat（必须 duplicate，否则会影响共用同一 SubResource 的其他按钮 ✗）
+var _sg_style: StyleBoxFlat = null
+## 颜色反馈用的 Tween
+var _sg_flash_tween: Tween = null
 
 var _icon_no_ground: Texture2D = null
 var _icon_has_ground: Texture2D = null
@@ -265,6 +292,89 @@ func _send_ground_command(enabled: bool) -> void:
 	print("[CarMode] 发送地面命令 enabled=", enabled, " 成功=", sent)
 
 
+## 拖动中：按钮跟随手指
+func _move_set_ground_to(global_pos: Vector2) -> void:
+	if not _sg_dragging:
+		return
+
+	set_ground_button.global_position = global_pos - _sg_grab_offset
+
+	# 拖满距离 → 触发切换 ✓
+	var moved: float = (
+		set_ground_button.global_position - _sg_rest_position
+	).length()
+
+	if moved >= SET_GROUND_DRAG_DIST:
+		_trigger_drag_toggle()
+
+
+## 拖满 300px：弹回原位 + 切换状态 + 闪烁
+func _trigger_drag_toggle() -> void:
+	_sg_dragging = false
+
+	print("[CarMode] SetGround 拖动完成 → 切换状态")
+
+	# HAS_GROUND 先取反（Blender 会再回传确认，最终以回传为准 ✓）
+	if HAS_GROUND:
+		_send_ground_command(false)
+	else:
+		_send_ground_command(true)
+
+	_snap_back()      # 弹回后会通过 tween_callback 触发闪烁 ✓
+
+
+## 拖动取消（没拖够就松手）：弹回，不切换
+func _cancel_drag() -> void:
+	_sg_dragging = false
+	print("[CarMode] SetGround 拖动取消（未满 300px）")
+	_snap_back()
+
+
+## 弹回固定位置（0.15s 补间）
+func _snap_back() -> void:
+	if _sg_flash_tween != null and _sg_flash_tween.is_valid():
+		_sg_flash_tween.kill()
+
+	_sg_flash_tween = create_tween()
+	_sg_flash_tween.tween_property(
+		set_ground_button, "global_position", _sg_rest_position, SET_GROUND_SNAP_SEC
+	).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_sg_flash_tween.tween_callback(_play_color_flash)
+
+
+## 颜色反馈：
+##   完全透明 → 彩色（0.12s）→ 保持（0.10s）→ 完全透明（0.22s）→ 直接回常态色
+func _play_color_flash() -> void:
+	if _sg_style == null:
+		return
+
+	if _sg_flash_tween != null and _sg_flash_tween.is_valid():
+		_sg_flash_tween.kill()
+
+	var flash_color: Color = (
+		COLOR_HAS_GROUND if HAS_GROUND else COLOR_NO_GROUND
+	)
+
+	var transparent: Color = flash_color
+	transparent.a = 0.0
+
+	_sg_flash_tween = create_tween()
+	# ① 透明 → 彩色
+	_sg_flash_tween.tween_property(
+		_sg_style, "bg_color", flash_color, SET_GROUND_FLASH_IN
+	)
+	# ② 保持
+	_sg_flash_tween.tween_interval(SET_GROUND_FLASH_HOLD)
+	# ③ 彩色 → 透明
+	_sg_flash_tween.tween_property(
+		_sg_style, "bg_color", transparent, SET_GROUND_FLASH_OUT
+	)
+	# ④ 直接回常态色
+	_sg_flash_tween.tween_callback(
+		func() -> void: _sg_style.bg_color = COLOR_SET_GROUND_NORMAL
+	)
+
+
 ## 按 HAS_GROUND 更新图标
 func _update_set_ground_icon() -> void:
 	if set_ground_button == null:
@@ -290,16 +400,19 @@ func _update_set_ground_visibility() -> void:
 		print("[CarMode] SetGround 按钮始终显示")
 
 
-func _on_set_ground_button_down() -> void:
-	print("[CarMode][DBG] SetGround button_down")
+func _on_set_ground_button_down(grab_pos: Vector2) -> void:
 	_set_ground_holding = true
 	_set_ground_hold_time = 0.0
+	_sg_grab_offset = grab_pos - set_ground_button.global_position
 
 
 func _on_set_ground_button_up() -> void:
-	print("[CarMode][DBG] SetGround button_up  按住时长=%.2fs" % _set_ground_hold_time)
 	_set_ground_holding = false
 	_set_ground_hold_time = 0.0
+
+	# 拖动中被松开（没拖够 300px）→ 弹回，不切换 ✓
+	if _sg_dragging:
+		_cancel_drag()
 
 
 ## 长按计时：达到 SET_GROUND_HOLD_SEC 就切换 HAS_GROUND
@@ -315,12 +428,12 @@ func _tick_set_ground_hold(delta: float) -> void:
 	_set_ground_holding = false
 	_set_ground_hold_time = 0.0
 
-	# 已开启 → 直接关闭；未开启 → 请 Blender 打射线判定
-	# （射线打不到物体时 Blender 会回 has_ground = false，此时用水平面当地面）
-	if HAS_GROUND:
-		_send_ground_command(false)
-	else:
-		_send_ground_command(true)
+	# 长按成功 → 进入【拖动状态】✓
+	#   拖满 SET_GROUND_DRAG_DIST 才真正切换（双重防误触 ✓）
+	_sg_dragging = true
+	_sg_rest_position = set_ground_button.global_position
+
+	print("[CarMode] SetGround 进入拖动状态（拖满 300px 切换）")
 
 
 func _ready() -> void:
@@ -374,6 +487,17 @@ func _ready() -> void:
 		set_ground_button.expand_icon = true
 		# ⚠️ 不用 button_down/button_up 信号：真机上不可靠 ✗
 		#    改用 _input() 手动矩形命中检测（和 drone_mode 的 Roll 按钮同一套做法）
+
+	# SetGround：复制一份专属样式（SubResource 是共用的 ✗ 直接改会影响别的按钮 ✗）
+	if set_ground_button != null:
+		var base_style: StyleBox = set_ground_button.get_theme_stylebox("normal")
+
+		if base_style is StyleBoxFlat:
+			_sg_style = (base_style as StyleBoxFlat).duplicate()
+			set_ground_button.add_theme_stylebox_override("normal", _sg_style)
+			_sg_style.bg_color = COLOR_SET_GROUND_NORMAL
+
+		_sg_rest_position = set_ground_button.global_position
 
 	_update_set_ground_icon()
 	_update_set_ground_visibility()
@@ -619,14 +743,19 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch:
 		# SetGround：按下开始计时，抬起结束（手动命中检测，真机可靠 ✓）
 		if event.pressed and _is_set_ground_hit(event.position):
-			print("[CarMode][DBG] SetGround 触摸按下 pos=", event.position)
-			_on_set_ground_button_down()
+			_on_set_ground_button_down(event.position)
 			# ⚠️ 不调用 set_input_as_handled()，与其他按钮保持一致
 			return
 
-		if not event.pressed and _set_ground_holding:
+		if not event.pressed and (_set_ground_holding or _sg_dragging):
 			_on_set_ground_button_up()
 			return
+
+	# 拖动中：手指移动 → 按钮跟随
+	if event is InputEventScreenDrag:
+		if _sg_dragging:
+			_move_set_ground_to((event as InputEventScreenDrag).position)
+		return
 
 		if event.pressed and _is_zoom_fit_hit(event.position):
 			_toggle_zoom_fit()
