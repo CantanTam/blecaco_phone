@@ -84,6 +84,8 @@ var _bh_holding: bool = false
 var _bh_hold_time: float = 0.0
 var _bh_dragging: bool = false
 var _bh_grab_offset: Vector2 = Vector2.ZERO
+## 手指最新位置（长按满 2 秒时立刻用它对位 ✓）
+var _bh_last_pos: Vector2 = Vector2.ZERO
 var _bh_rest_position: Vector2 = Vector2.ZERO
 var _bh_style: StyleBoxFlat = null
 var _bh_flash_tween: Tween = null
@@ -257,6 +259,7 @@ func _on_body_height_down(grab_pos: Vector2) -> void:
 	_bh_holding = true
 	_bh_hold_time = 0.0
 	_bh_grab_offset = grab_pos - set_body_height_button.global_position
+	_bh_last_pos = grab_pos
 
 
 func _on_body_height_up() -> void:
@@ -297,6 +300,11 @@ func _tick_body_height_hold(delta: float) -> void:
 	_bh_hold_time = 0.0
 	_bh_dragging = true
 	_bh_rest_position = set_body_height_button.global_position
+
+	# ★ 立刻让按钮【圆心】对到手指（不等下一次拖动事件 ✓）
+	#   把抓取偏移改成半个按钮尺寸 → 圆心 = 手指 ✓
+	_bh_grab_offset = set_body_height_button.size * 0.5
+	set_body_height_button.global_position = _bh_last_pos - _bh_grab_offset
 
 	print("[GameMode] SetBodyHeight 进入拖动状态（拖满 300px 后松手切换）")
 
@@ -570,6 +578,8 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventScreenDrag:
 		var drag := event as InputEventScreenDrag
 
+		_bh_last_pos = drag.position        # 始终记录 ✓
+
 		# SetBodyHeight 拖动
 		if _bh_dragging:
 			_move_body_height_to(drag.position)
@@ -625,6 +635,8 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion:
 		if _touch_platform:
 			return
+
+		_bh_last_pos = (event as InputEventMouseMotion).position
 
 		# SetBodyHeight 拖动（桌面测试用 ✓）
 		if _bh_dragging:
