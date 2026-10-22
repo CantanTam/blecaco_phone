@@ -8,6 +8,19 @@ extends Control
 ## 触摸用 _input() 手动命中检测（Button 的 gui 信号在真机上不可靠 ✗
 ## 参考 drone_mode 的 Roll 按钮做法）。
 
+## SetBodyHeight 长按/拖动参数（与 car_mode 的 SetGround 同款 ✓）
+const BODY_HEIGHT_HOLD_SEC: float = 2.0
+const BODY_HEIGHT_DRAG_DIST: float = 300.0
+const BODY_HEIGHT_SNAP_SEC: float = 0.15
+const BODY_HEIGHT_FLASH_IN: float = 0.12
+const BODY_HEIGHT_FLASH_HOLD: float = 0.10
+const BODY_HEIGHT_FLASH_OUT: float = 0.22
+const ICON_BODY_HEIGHT_ON: String = "res://resources/BodyHeight.svg"
+const ICON_BODY_HEIGHT_OFF: String = "res://resources/NoBodyHeight.svg"
+const COLOR_ON := Color("00d455ff")
+const COLOR_OFF := Color("ff5555ff")
+const COLOR_BTN_NORMAL := Color("000000a0")
+
 ## 摇杆归一化半径（位移 / 此值 = -1..1）
 const STICK_LIMIT_RADIUS: float = 250.0
 
@@ -63,6 +76,18 @@ var _stick_vector: Vector2 = Vector2.ZERO
 ## RunSpeed 档位计数：每次点击 +1，图标由 RUN_SPEED % 3 决定
 var RUN_SPEED: int = 1
 
+## 地面人物高度开关
+var GROUND_BODY_HEIGHT: bool = false
+
+## SetBodyHeight 交互状态
+var _bh_holding: bool = false
+var _bh_hold_time: float = 0.0
+var _bh_dragging: bool = false
+var _bh_grab_offset: Vector2 = Vector2.ZERO
+var _bh_rest_position: Vector2 = Vector2.ZERO
+var _bh_style: StyleBoxFlat = null
+var _bh_flash_tween: Tween = null
+
 ## 是否为触摸设备（真机上触摸会产生【模拟鼠标事件】✗ 必须跳过 ✗）
 var _touch_platform: bool = false
 
@@ -91,6 +116,7 @@ var _drag_pointer_id: int = -1
 @onready var move_button: Panel = $MoveStickArea/MoveButton
 @onready var game_run_notice: Panel = $GameRunNotice
 @onready var run_speed_button: Button = $RunSpeed
+@onready var set_body_height_button: Button = $SetBodyHeight
 
 
 func _ready() -> void:
@@ -119,6 +145,21 @@ func _ready() -> void:
 		run_speed_button.expand_icon = true
 
 	_apply_run_speed_icon()
+
+	# SetBodyHeight：复制专属样式 + 记录原位 + 初始图标
+	if set_body_height_button != null:
+		set_body_height_button.focus_mode = Control.FOCUS_NONE
+		set_body_height_button.expand_icon = true
+
+		var bh_base: StyleBox = set_body_height_button.get_theme_stylebox("normal")
+
+		if bh_base is StyleBoxFlat:
+			_bh_style = (bh_base as StyleBoxFlat).duplicate()
+			set_body_height_button.add_theme_stylebox_override("normal", _bh_style)
+			_bh_style.bg_color = COLOR_BTN_NORMAL
+
+		_bh_rest_position = set_body_height_button.global_position
+		_apply_body_height_icon()
 
 	# 找 Blender 连接节点
 	connection_node = get_tree().root.find_child(CONNECTION_NODE_NAME, true, false)
@@ -185,6 +226,121 @@ func _is_run_speed_hit(viewport_position: Vector2) -> bool:
 		return false
 
 	return run_speed_button.get_global_rect().has_point(viewport_position)
+
+
+# ============================================================
+# SetBodyHeight：长按 → 拖动 → 松手判定 → 切换 + 弹回 + 闪烁
+# 交互逻辑与 car_mode 的 SetGround 一致 ✓
+# ============================================================
+
+func _is_body_height_hit(viewport_position: Vector2) -> bool:
+	if set_body_height_button == null or not set_body_height_button.is_visible_in_tree():
+		return false
+	return set_body_height_button.get_global_rect().has_point(viewport_position)
+
+
+func _apply_body_height_icon() -> void:
+	if set_body_height_button == null:
+		return
+
+	var path: String = ICON_BODY_HEIGHT_ON if GROUND_BODY_HEIGHT else ICON_BODY_HEIGHT_OFF
+
+	if not ResourceLoader.exists(path):
+		print("[GameMode] BodyHeight 图标缺失：", path)
+		return
+
+	set_body_height_button.icon = load(path)
+	set_body_height_button.expand_icon = true
+
+
+func _on_body_height_down(grab_pos: Vector2) -> void:
+	_bh_holding = true
+	_bh_hold_time = 0.0
+	_bh_grab_offset = grab_pos - set_body_height_button.global_position
+
+
+func _on_body_height_up() -> void:
+	_bh_holding = false
+	_bh_hold_time = 0.0
+
+	if not _bh_dragging:
+		return
+
+	# 松手时才判定距离 ✓
+	var moved: float = (
+		set_body_height_button.global_position - _bh_rest_position
+	).length()
+
+	if moved >= BODY_HEIGHT_DRAG_DIST:
+		_bh_dragging = false
+		GROUND_BODY_HEIGHT = not GROUND_BODY_HEIGHT
+		print("[GameMode] GROUND_BODY_HEIGHT = ", GROUND_BODY_HEIGHT)
+		_apply_body_height_icon()
+		_bh_snap_back()
+	else:
+		_bh_dragging = false
+		print("[GameMode] SetBodyHeight 拖动取消（未满 300px）")
+		_bh_snap_back()
+
+
+## 长按计时：满 2 秒进入拖动状态
+func _tick_body_height_hold(delta: float) -> void:
+	if not _bh_holding:
+		return
+
+	_bh_hold_time += clampf(delta, 0.0, 0.05)
+
+	if _bh_hold_time < BODY_HEIGHT_HOLD_SEC:
+		return
+
+	_bh_holding = false
+	_bh_hold_time = 0.0
+	_bh_dragging = true
+	_bh_rest_position = set_body_height_button.global_position
+
+	print("[GameMode] SetBodyHeight 进入拖动状态（拖满 300px 后松手切换）")
+
+
+## 拖动跟随（不触发切换 ✗）
+func _move_body_height_to(global_pos: Vector2) -> void:
+	if not _bh_dragging:
+		return
+
+	set_body_height_button.global_position = global_pos - _bh_grab_offset
+
+
+## 弹回原位（0.15s BACK 缓动）→ 完成后闪烁
+func _bh_snap_back() -> void:
+	if _bh_flash_tween != null and _bh_flash_tween.is_valid():
+		_bh_flash_tween.kill()
+
+	_bh_flash_tween = create_tween()
+	_bh_flash_tween.tween_property(
+		set_body_height_button, "global_position", _bh_rest_position,
+		BODY_HEIGHT_SNAP_SEC
+	).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_bh_flash_tween.tween_callback(_play_body_height_flash)
+
+
+## 颜色反馈：透明 → 彩色 → 保持 → 透明 → 直接回常态色
+func _play_body_height_flash() -> void:
+	if _bh_style == null:
+		return
+
+	if _bh_flash_tween != null and _bh_flash_tween.is_valid():
+		_bh_flash_tween.kill()
+
+	var flash_color: Color = COLOR_ON if GROUND_BODY_HEIGHT else COLOR_OFF
+	var transparent: Color = flash_color
+	transparent.a = 0.0
+
+	_bh_flash_tween = create_tween()
+	_bh_flash_tween.tween_property(_bh_style, "bg_color", flash_color, BODY_HEIGHT_FLASH_IN)
+	_bh_flash_tween.tween_interval(BODY_HEIGHT_FLASH_HOLD)
+	_bh_flash_tween.tween_property(_bh_style, "bg_color", transparent, BODY_HEIGHT_FLASH_OUT)
+	_bh_flash_tween.tween_callback(
+		func() -> void: _bh_style.bg_color = COLOR_BTN_NORMAL
+	)
 
 
 ## 计算 MoveButton 的静止位置（让它圆心对齐 MoveStickArea 圆心）
@@ -306,6 +462,9 @@ func _reset_button() -> void:
 
 ## 按固定频率把摇杆向量发给 Blender
 func _process(delta: float) -> void:
+	# SetBodyHeight 长按计时（放最前面，避免被后面的早退挡住 ✓）
+	_tick_body_height_hold(delta)
+
 	if connection_node == null or not is_instance_valid(connection_node):
 		return
 
@@ -372,6 +531,15 @@ func _input(event: InputEvent) -> void:
 				_cycle_run_speed()
 				return
 
+			# SetBodyHeight 按下 → 开始长按计时
+			if _is_body_height_hit(touch.position):
+				_on_body_height_down(touch.position)
+				return
+
+			# 拖动中不响应别的
+			if _bh_dragging:
+				return
+
 			if _dragging:
 				return
 
@@ -388,6 +556,11 @@ func _input(event: InputEvent) -> void:
 			print("[GameMode] 开始拖动 index=", touch.index, " pos=", touch.position)
 			return
 
+		# SetBodyHeight 抬起
+		if _bh_holding or _bh_dragging:
+			_on_body_height_up()
+			return
+
 		# 抬起：只处理正在拖动的那根手指
 		if _dragging and touch.index == _drag_pointer_id:
 			_reset_button()
@@ -396,6 +569,11 @@ func _input(event: InputEvent) -> void:
 
 	if event is InputEventScreenDrag:
 		var drag := event as InputEventScreenDrag
+
+		# SetBodyHeight 拖动
+		if _bh_dragging:
+			_move_body_height_to(drag.position)
+			return
 
 		if not _dragging or drag.index != _drag_pointer_id:
 			return
