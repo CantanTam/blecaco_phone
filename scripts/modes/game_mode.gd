@@ -27,7 +27,10 @@ const LOOK_RADIUS: float = 200.0
 
 var _look_pointer_id: int = -1
 var _look_center: Vector2 = Vector2.ZERO
-var _look_vector: Vector2 = Vector2.ZERO      # x 右为正 / y 下为正，长度 ≤ 1
+var _look_vector: Vector2 = Vector2.ZERO      # 已废弃（保留兼容）
+## 累积的像素位移（直接映射 ✓ 拖多少转多少）
+var _look_delta: Vector2 = Vector2.ZERO
+var _look_last_pos: Vector2 = Vector2.ZERO      # x 右为正 / y 下为正，长度 ≤ 1
 
 ## 摇杆归一化半径（位移 / 此值 = -1..1）
 const STICK_LIMIT_RADIUS: float = 250.0
@@ -334,26 +337,26 @@ func is_landscape_ui() -> bool:
 func _start_look(pointer_id: int, position: Vector2) -> void:
 	_look_pointer_id = pointer_id
 	_look_center = position
-	_look_vector = Vector2.ZERO
+	_look_last_pos = position
+	_look_delta = Vector2.ZERO
 	print("[GameMode] 开始视角控制 index=", pointer_id, " 圆心=", position)
 
 
 func _stop_look() -> void:
 	_look_pointer_id = -1
 	_look_vector = Vector2.ZERO
+	_look_delta = Vector2.ZERO
 
 
 ## 拖动 → 计算归一化向量（方向 = 夹角 ✓ 大小 = 距离 ✓）
+## 拖动 → 累积像素增量（直接映射 ✓ 拖多少转多少，松手即停）
 func _update_look(position: Vector2) -> void:
-	var delta: Vector2 = position - _look_center
-	var distance: float = delta.length()
+	var delta: Vector2 = position - _look_last_pos
+	_look_last_pos = position
 
-	if distance < 1e-5:
-		_look_vector = Vector2.ZERO
-		return
-
-	var magnitude: float = minf(distance / LOOK_RADIUS, 1.0)
-	_look_vector = (delta / distance) * magnitude
+	# 只在有位移时累积
+	if delta.length() > 1e-5:
+		_look_delta += delta
 
 
 ## 是否正在移动（摇杆有输出 ✓ 对标 car_mode 的 _is_forward_pressed）
@@ -717,6 +720,11 @@ func _process(delta: float) -> void:
 	var k: float = 1.0 - exp(-delta / maxf(RUN_TRANSITION_TAU, 1e-4))
 	_sprint_multiplier = lerpf(_sprint_multiplier, target_multiplier, k)
 
+	# 取出并清零（发送后不留残量 ✓）
+	var send_dx: float = _look_delta.x
+	var send_dy: float = _look_delta.y
+	_look_delta = Vector2.ZERO
+
 	connection_node.call(
 		"send_action",
 		"game",
@@ -725,8 +733,8 @@ func _process(delta: float) -> void:
 			"ry": _stick_vector.y,
 			"sprint": _sprinting,
 			"run_multiplier": _sprint_multiplier,
-			"look_x": _look_vector.x,
-			"look_y": _look_vector.y,
+			"look_dx": send_dx,
+			"look_dy": send_dy,
 		}
 	)
 
