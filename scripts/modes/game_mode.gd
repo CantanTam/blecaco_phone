@@ -291,11 +291,9 @@ func _is_run_speed_hit(viewport_position: Vector2) -> bool:
 # ============================================================
 
 ## 落点是否应该进入"视角控制"（横屏右半屏、且不在其他按钮上）
+## 本 App 只在横屏下使用 ✓
 func _should_start_look(viewport_position: Vector2) -> bool:
-	if not is_landscape_ui():
-		return viewport_position.x > get_viewport_rect().size.x * 0.5
-
-	# 横屏：右半屏
+	# 必须是右半屏
 	if viewport_position.x < get_viewport_rect().size.x * 0.5:
 		return false
 
