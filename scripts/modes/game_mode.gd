@@ -200,9 +200,6 @@ func _ready() -> void:
 			set_body_height_button.offset_right,
 			set_body_height_button.offset_bottom,
 		]
-		# 用 offset 还原后再取一次（保证与场景定义一致 ✓）
-	_restore_body_height_offsets()
-	_gg_rest_position = set_body_height_button.global_position
 		_apply_body_height_icon()
 
 	# 找 Blender 连接节点
