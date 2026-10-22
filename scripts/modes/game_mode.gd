@@ -237,6 +237,11 @@ func _is_run_speed_hit(viewport_position: Vector2) -> bool:
 # 交互逻辑与 car_mode 的 SetGround 一致 ✓
 # ============================================================
 
+## 是否正在移动（摇杆有输出 ✓ 对标 car_mode 的 _is_forward_pressed）
+func _is_game_moving() -> bool:
+	return _stick_vector.length() > 0.01
+
+
 func _is_body_height_hit(viewport_position: Vector2) -> bool:
 	if set_body_height_button == null or not set_body_height_button.is_visible_in_tree():
 		return false
@@ -295,6 +300,13 @@ func _tick_body_height_hold(delta: float) -> void:
 
 	_bh_hold_time += clampf(delta, 0.0, 0.05)
 
+	# 移动中 → 长按中止 ✓
+	if _is_game_moving():
+		_bh_holding = false
+		_bh_hold_time = 0.0
+		print("[GameMode] 移动中 → SetBodyHeight 长按中止")
+		return
+
 	if _bh_hold_time < BODY_HEIGHT_HOLD_SEC:
 		return
 
@@ -314,7 +326,19 @@ func _move_body_height_to(global_pos: Vector2) -> void:
 	if not _bh_dragging:
 		return
 
+	# 拖动中开始移动 → 取消拖动 ✓
+	if _is_game_moving():
+		_on_body_height_up_cancel()
+		return
+
 	set_body_height_button.global_position = global_pos - set_body_height_button.size * 0.5
+
+
+## 取消拖动：弹回，不切换 ✓
+func _on_body_height_up_cancel() -> void:
+	_bh_dragging = false
+	print("[GameMode] SetBodyHeight 拖动取消（移动中）")
+	_bh_snap_back(false)
 
 
 ## 弹回原位（0.15s BACK 缓动）→ 完成后闪烁
@@ -543,6 +567,9 @@ func _input(event: InputEvent) -> void:
 
 			# SetBodyHeight 按下 → 开始长按计时
 			if _is_body_height_hit(touch.position):
+				# 移动中不允许拖动 ✓（对标 car_mode ✓）
+				if _is_game_moving():
+					return
 				_on_body_height_down(touch.position)
 				return
 
@@ -612,6 +639,8 @@ func _input(event: InputEvent) -> void:
 
 			# SetBodyHeight 按下（桌面测试用 ✓）
 			if _is_body_height_hit(mouse.position):
+				if _is_game_moving():
+					return
 				_on_body_height_down(mouse.position)
 				return
 

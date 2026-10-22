@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="120"
+   height="120"
+   viewBox="0 0 31.749999 31.75"
+   version="1.1"
+   id="svg1"
+   inkscape:version="1.4.4 (dcaf3e7d9e, 2026-05-05)"
+   sodipodi:docname="GameCollision.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#ffffff"
+     bordercolor="#999999"
+     borderopacity="1"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0"
+     inkscape:pagecheckerboard="true"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="px"
+     inkscape:zoom="1.13"
+     inkscape:cx="85.39823"
+     inkscape:cy="-57.964602"
+     inkscape:window-width="1270"
+     inkscape:window-height="1354"
+     inkscape:window-x="1290"
+     inkscape:window-y="0"
+     inkscape:window-maximized="0"
+     inkscape:current-layer="svg1" />
+  <defs
+     id="defs1" />
+  <path
+     id="path5"
+     style="baseline-shift:baseline;display:inline;overflow:visible;vector-effect:none;fill:#ffffff;stroke-width:0.738162;stroke-linecap:round;stroke-linejoin:round;paint-order:markers fill stroke;enable-background:accumulate;stop-color:#000000"
+     d="m 20.624064,6.6807291 -5.666838,0.00103 A 1.1072438,1.1072438 0 0 0 13.8498,7.7891885 1.1072438,1.1072438 0 0 0 14.95671,8.8960977 l 3.010152,-5.168e-4 -4.15892,4.1589191 c -1.497411,1.49741 -1.497412,3.958587 0,5.455998 l 6.04976,6.04976 a 1.1072438,1.1072438 0 0 0 1.565796,-5.17e-4 1.1072438,1.1072438 0 0 0 0,-1.565279 l -6.04976,-6.04976 c -0.657,-0.657 -0.657,-1.667406 0,-2.324406 l 4.159436,-4.159436 v 3.011702 a 1.1072438,1.1072438 0 0 0 1.106909,1.10691 1.1072438,1.1072438 0 0 0 1.107426,-1.107426 l 10e-4,-5.6828575 a 1.1073545,1.1073545 0 0 0 -0.324011,-0.7839314 1.1073545,1.1073545 0 0 0 -0.112138,-0.097152 1.1073545,1.1073545 0 0 0 -0.12299,-0.081649 1.1072438,1.1072438 0 0 0 -0.0083,-0.00413 1.1073545,1.1073545 0 0 0 -0.12144,-0.058911 1.1072438,1.1072438 0 0 0 -0.05013,-0.017053 1.1073545,1.1073545 0 0 0 -0.08888,-0.028939 1.1072438,1.1072438 0 0 0 -0.06098,-0.012402 1.1073545,1.1073545 0 0 0 -0.0801,-0.014986 1.1072438,1.1072438 0 0 0 -0.07958,-0.00568 1.1073545,1.1073545 0 0 0 -0.05994,-0.00362 z M 9.7131021,9.2170083 a 1.107245,1.107245 0 0 0 -1.107426,1.1074257 v 11.247892 a 1.107245,1.107245 0 0 0 1.107426,1.107426 1.107245,1.107245 0 0 0 1.1074259,-1.107426 V 10.324434 A 1.107245,1.107245 0 0 0 9.7131021,9.2170083 Z"
+     inkscape:label="GameCollision" />
+</svg>
