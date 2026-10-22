@@ -299,13 +299,7 @@ func _move_set_ground_to(global_pos: Vector2) -> void:
 
 	set_ground_button.global_position = global_pos - _sg_grab_offset
 
-	# 拖满距离 → 触发切换 ✓
-	var moved: float = (
-		set_ground_button.global_position - _sg_rest_position
-	).length()
-
-	if moved >= SET_GROUND_DRAG_DIST:
-		_trigger_drag_toggle()
+	# ⚠️ 这里【不触发】✗ 只在松手时判定（见 _on_set_ground_button_up）
 
 
 ## 拖满 300px：弹回原位 + 切换状态 + 闪烁
@@ -410,8 +404,19 @@ func _on_set_ground_button_up() -> void:
 	_set_ground_holding = false
 	_set_ground_hold_time = 0.0
 
-	# 拖动中被松开（没拖够 300px）→ 弹回，不切换 ✓
-	if _sg_dragging:
+	if not _sg_dragging:
+		return
+
+	# 松手时才判定拖动距离 ✓
+	var moved: float = (
+		set_ground_button.global_position - _sg_rest_position
+	).length()
+
+	if moved >= SET_GROUND_DRAG_DIST:
+		# 拖够了 → 切换 + 弹回 + 闪烁 ✓
+		_trigger_drag_toggle()
+	else:
+		# 没拖够 → 弹回，不切换 ✓
 		_cancel_drag()
 
 
