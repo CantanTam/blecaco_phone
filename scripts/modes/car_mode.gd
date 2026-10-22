@@ -224,6 +224,18 @@ var car_mode_initialized: bool = false
 # ── SetGround 相关 ──────────────────────────────────────
 
 
+## CarForwardArea 当前是否被按下（用于禁止移动中拖动 SetGround ✓）
+func _is_forward_pressed() -> bool:
+	if forward_area == null:
+		return false
+
+	var v: Variant = forward_area.get("forward_speed")
+	if v == null:
+		return false
+
+	return absf(float(v)) > 0.01
+
+
 ## 屏幕坐标是否落在 SetGround 按钮上
 func _is_set_ground_hit(viewport_position: Vector2) -> bool:
 	if set_ground_button == null or not set_ground_button.visible:
@@ -246,6 +258,28 @@ func _on_ground_status_message(message: String) -> void:
 		bool(data.get("has_ground", false)),
 		str(data.get("object", ""))
 	)
+
+
+## Blender 推送：移动中相机脚下第一个物体是否带 is_ground
+##   变化时 → 切图标 + 闪一下（绿=有 / 红=无）
+func _on_ground_indicator_message(message: String) -> void:
+	var data: Variant = JSON.parse_string(message)
+	if not (data is Dictionary):
+		return
+	if data.get("type") != "ground_indicator":
+		return
+
+	var has_ground: bool = bool(data.get("has_ground", false))
+
+	# 状态没变就不打扰（Blender 也只在变化时推 ✓ 这里双保险 ✓）
+	if has_ground == HAS_GROUND:
+		return
+
+	HAS_GROUND = has_ground
+	_update_set_ground_icon()
+	_play_color_flash()
+
+	print("[CarMode] 脚下地面指示 → HAS_GROUND = ", HAS_GROUND)
 
 
 ## Blender 回报地面标记结果
@@ -552,6 +586,13 @@ func _ready() -> void:
 					_on_ground_status_message
 				)
 
+			if not connection_node.text_message_received.is_connected(
+				_on_ground_indicator_message
+			):
+				connection_node.text_message_received.connect(
+					_on_ground_indicator_message
+				)
+
 	if rotation_sender.is_available():
 		print("[CarMode] Orientation plugin loaded")
 	else:
@@ -763,6 +804,9 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch:
 		# SetGround：按下开始计时，抬起结束（手动命中检测，真机可靠 ✓）
 		if event.pressed and _is_set_ground_hit(event.position):
+			# 移动中（CarForwardArea 被按下）不允许拖动 SetGround ✓
+			if _is_forward_pressed():
+				return
 			_on_set_ground_button_down(event.position)
 			# ⚠️ 不调用 set_input_as_handled()，与其他按钮保持一致
 			return
