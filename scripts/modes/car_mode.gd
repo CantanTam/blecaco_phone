@@ -114,6 +114,9 @@ const COLOR_SET_GROUND_NORMAL := Color("000000a0")
 # 是否启用地面追踪（默认关闭）
 var HAS_GROUND: bool = false
 
+## 相机 -Y 下方是否有物体（Blender 每 100ms 更新 ✓）
+var _has_surface: bool = false
+
 ## 是否处于拖动状态（长按满 2 秒后进入）
 var _sg_dragging: bool = false
 ## 按下点相对按钮左上角的偏移（保证拖动不跳位）
@@ -286,6 +289,11 @@ func _on_ground_status_message(message: String) -> void:
 
 ## Blender 推送：移动中相机脚下第一个物体是否带 is_ground
 ##   变化时 → 切图标 + 闪一下（绿=有 / 红=无）
+func _on_ground_indicator_message(message: String) -> void:
+	var _d: Variant = JSON.parse_string(message)
+	if _d is Dictionary and _d.get("type") == "ground_indicator":
+		_has_surface = bool(_d.get("has_surface", false))
+
 func _on_ground_indicator_message(message: String) -> void:
 	var data: Variant = JSON.parse_string(message)
 	if not (data is Dictionary):
@@ -511,6 +519,12 @@ func _tick_set_ground_hold(delta: float) -> void:
 
 	_set_ground_holding = false
 	_set_ground_hold_time = 0.0
+
+	# ★ 长按成功 → 先检查相机 -Y 是否穿透了某个物体 ✓
+	#   没有 → 不能拖动、不能改 is_ground（提前 return ✓）
+	if not _has_surface:
+		print("[CarMode] 相机下方没有物体 → SetGround 无法拖动")
+		return
 
 	# 长按成功 → 进入【拖动状态】✓
 	#   拖满 SET_GROUND_DRAG_DIST 才真正切换（双重防误触 ✓）
