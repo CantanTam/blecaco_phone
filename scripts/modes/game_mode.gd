@@ -117,8 +117,6 @@ var _gg_grab_offset: Vector2 = Vector2.ZERO
 var _gg_last_pos: Vector2 = Vector2.ZERO
 var _gg_rest_position: Vector2 = Vector2.ZERO
 
-## 按钮在场景里定义的 offset（锚点定位 ✗ 不能靠 global_position 还原）
-var _gg_rest_offsets: Array = []
 var _gg_style: StyleBoxFlat = null
 var _gg_flash_tween: Tween = null
 
@@ -194,12 +192,8 @@ func _ready() -> void:
 
 		set_body_height_button.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-		_gg_rest_offsets = [
-			set_body_height_button.offset_left,
-			set_body_height_button.offset_top,
-			set_body_height_button.offset_right,
-			set_body_height_button.offset_bottom,
-		]
+		# 与 car_mode 完全一致：记录一次原位 ✓
+		_gg_rest_position = set_body_height_button.global_position
 		_apply_body_height_icon()
 
 	# 找 Blender 连接节点
@@ -293,17 +287,6 @@ func _is_body_height_hit(viewport_position: Vector2) -> bool:
 	if set_body_height_button == null or not set_body_height_button.is_visible_in_tree():
 		return false
 	return set_body_height_button.get_global_rect().has_point(viewport_position)
-
-
-## 把按钮恢复到场景定义的锚点偏移（最可靠 ✓ 与 viewport 尺寸无关）
-func _restore_body_height_offsets() -> void:
-	if set_body_height_button == null or _gg_rest_offsets.size() != 4:
-		return
-
-	set_body_height_button.offset_left = _gg_rest_offsets[0]
-	set_body_height_button.offset_top = _gg_rest_offsets[1]
-	set_body_height_button.offset_right = _gg_rest_offsets[2]
-	set_body_height_button.offset_bottom = _gg_rest_offsets[3]
 
 
 ## 按指定状态更新图标（脚下指示用 ✓）
@@ -418,9 +401,7 @@ func _tick_body_height_hold(delta: float) -> void:
 		print("[GameMode] 相机下方没有物体 → SetBodyHeight 无法拖动")
 		return
 
-	# 先按场景定义的锚点偏移还原（保证取到的是"真正原位" ✓）
-	_restore_body_height_offsets()
-
+	# 与 car_mode 完全一致：进入拖动时再记录一次 ✓
 	_gg_dragging = true
 	_gg_rest_position = set_body_height_button.global_position
 
@@ -456,11 +437,8 @@ func _gg_snap_back(flash: bool) -> void:
 		_gg_flash_tween.kill()
 
 	_gg_flash_tween = create_tween()
-	# 先算出"原位"的 global_position（按当前 viewport 尺寸 ✓）
-	var rest_global: Vector2 = _gg_rest_position
-
 	_gg_flash_tween.tween_property(
-		set_body_height_button, "global_position", rest_global,
+		set_body_height_button, "global_position", _gg_rest_position,
 		BODY_HEIGHT_SNAP_SEC
 	).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
