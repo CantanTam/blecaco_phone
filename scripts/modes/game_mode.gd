@@ -77,18 +77,18 @@ var _stick_vector: Vector2 = Vector2.ZERO
 var RUN_SPEED: int = 1
 
 ## 地面人物高度开关
-var GROUND_BODY_HEIGHT: bool = false
+var HAS_GAME_GROUND: bool = false
 
 ## SetBodyHeight 交互状态
-var _bh_holding: bool = false
-var _bh_hold_time: float = 0.0
-var _bh_dragging: bool = false
-var _bh_grab_offset: Vector2 = Vector2.ZERO
+var _gg_holding: bool = false
+var _gg_hold_time: float = 0.0
+var _gg_dragging: bool = false
+var _gg_grab_offset: Vector2 = Vector2.ZERO
 ## 手指最新位置（长按满 2 秒时立刻用它对位 ✓）
-var _bh_last_pos: Vector2 = Vector2.ZERO
-var _bh_rest_position: Vector2 = Vector2.ZERO
-var _bh_style: StyleBoxFlat = null
-var _bh_flash_tween: Tween = null
+var _gg_last_pos: Vector2 = Vector2.ZERO
+var _gg_rest_position: Vector2 = Vector2.ZERO
+var _gg_style: StyleBoxFlat = null
+var _gg_flash_tween: Tween = null
 
 ## 是否为触摸设备（真机上触摸会产生【模拟鼠标事件】✗ 必须跳过 ✗）
 var _touch_platform: bool = false
@@ -156,13 +156,13 @@ func _ready() -> void:
 		var bh_base: StyleBox = set_body_height_button.get_theme_stylebox("normal")
 
 		if bh_base is StyleBoxFlat:
-			_bh_style = (bh_base as StyleBoxFlat).duplicate()
-			set_body_height_button.add_theme_stylebox_override("normal", _bh_style)
-			_bh_style.bg_color = COLOR_BTN_NORMAL
+			_gg_style = (bh_base as StyleBoxFlat).duplicate()
+			set_body_height_button.add_theme_stylebox_override("normal", _gg_style)
+			_gg_style.bg_color = COLOR_BTN_NORMAL
 
 		set_body_height_button.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-		_bh_rest_position = set_body_height_button.global_position
+		_gg_rest_position = set_body_height_button.global_position
 		_apply_body_height_icon()
 
 	# 找 Blender 连接节点
@@ -252,7 +252,7 @@ func _apply_body_height_icon() -> void:
 	if set_body_height_button == null:
 		return
 
-	var path: String = ICON_BODY_HEIGHT_ON if GROUND_BODY_HEIGHT else ICON_BODY_HEIGHT_OFF
+	var path: String = ICON_BODY_HEIGHT_ON if HAS_GAME_GROUND else ICON_BODY_HEIGHT_OFF
 
 	if not ResourceLoader.exists(path):
 		print("[GameMode] BodyHeight 图标缺失：", path)
@@ -263,67 +263,67 @@ func _apply_body_height_icon() -> void:
 
 
 func _on_body_height_down(grab_pos: Vector2) -> void:
-	_bh_holding = true
-	_bh_hold_time = 0.0
-	_bh_grab_offset = grab_pos - set_body_height_button.global_position
-	_bh_last_pos = grab_pos
+	_gg_holding = true
+	_gg_hold_time = 0.0
+	_gg_grab_offset = grab_pos - set_body_height_button.global_position
+	_gg_last_pos = grab_pos
 
 
 func _on_body_height_up() -> void:
-	_bh_holding = false
-	_bh_hold_time = 0.0
+	_gg_holding = false
+	_gg_hold_time = 0.0
 
-	if not _bh_dragging:
+	if not _gg_dragging:
 		return
 
 	# 松手时才判定距离 ✓
 	var moved: float = (
-		set_body_height_button.global_position - _bh_rest_position
+		set_body_height_button.global_position - _gg_rest_position
 	).length()
 
 	if moved >= BODY_HEIGHT_DRAG_DIST:
-		_bh_dragging = false
-		GROUND_BODY_HEIGHT = not GROUND_BODY_HEIGHT
-		print("[GameMode] GROUND_BODY_HEIGHT = ", GROUND_BODY_HEIGHT)
+		_gg_dragging = false
+		HAS_GAME_GROUND = not HAS_GAME_GROUND
+		print("[GameMode] HAS_GAME_GROUND = ", HAS_GAME_GROUND)
 		_apply_body_height_icon()
-		_bh_snap_back(true)
+		_gg_snap_back(true)
 	else:
-		_bh_dragging = false
+		_gg_dragging = false
 		print("[GameMode] SetBodyHeight 拖动取消（未满 300px）")
-		_bh_snap_back(false)     # 只弹回，不闪烁、不改图标 ✗
+		_gg_snap_back(false)     # 只弹回，不闪烁、不改图标 ✗
 
 
 ## 长按计时：满 2 秒进入拖动状态
 func _tick_body_height_hold(delta: float) -> void:
-	if not _bh_holding:
+	if not _gg_holding:
 		return
 
-	_bh_hold_time += clampf(delta, 0.0, 0.05)
+	_gg_hold_time += clampf(delta, 0.0, 0.05)
 
 	# 移动中 → 长按中止 ✓
 	if _is_game_moving():
-		_bh_holding = false
-		_bh_hold_time = 0.0
+		_gg_holding = false
+		_gg_hold_time = 0.0
 		print("[GameMode] 移动中 → SetBodyHeight 长按中止")
 		return
 
-	if _bh_hold_time < BODY_HEIGHT_HOLD_SEC:
+	if _gg_hold_time < BODY_HEIGHT_HOLD_SEC:
 		return
 
-	_bh_holding = false
-	_bh_hold_time = 0.0
-	_bh_dragging = true
-	_bh_rest_position = set_body_height_button.global_position
+	_gg_holding = false
+	_gg_hold_time = 0.0
+	_gg_dragging = true
+	_gg_rest_position = set_body_height_button.global_position
 
 	# ★ 照搬 MoveButton：圆心 = 手指 ✓
-	set_body_height_button.global_position = _bh_last_pos - set_body_height_button.size * 0.5
+	set_body_height_button.global_position = _gg_last_pos - set_body_height_button.size * 0.5
 
 	print("[GameMode] SetBodyHeight 进入拖动状态（拖满 300px 后松手切换）")
 
 
 ## 拖动跟随（不触发切换 ✗）
 func _move_body_height_to(global_pos: Vector2) -> void:
-	if not _bh_dragging:
+	if not _gg_dragging:
 		return
 
 	# 拖动中开始移动 → 取消拖动 ✓
@@ -336,44 +336,44 @@ func _move_body_height_to(global_pos: Vector2) -> void:
 
 ## 取消拖动：弹回，不切换 ✓
 func _on_body_height_up_cancel() -> void:
-	_bh_dragging = false
+	_gg_dragging = false
 	print("[GameMode] SetBodyHeight 拖动取消（移动中）")
-	_bh_snap_back(false)
+	_gg_snap_back(false)
 
 
 ## 弹回原位（0.15s BACK 缓动）→ 完成后闪烁
-func _bh_snap_back(flash: bool) -> void:
-	if _bh_flash_tween != null and _bh_flash_tween.is_valid():
-		_bh_flash_tween.kill()
+func _gg_snap_back(flash: bool) -> void:
+	if _gg_flash_tween != null and _gg_flash_tween.is_valid():
+		_gg_flash_tween.kill()
 
-	_bh_flash_tween = create_tween()
-	_bh_flash_tween.tween_property(
-		set_body_height_button, "global_position", _bh_rest_position,
+	_gg_flash_tween = create_tween()
+	_gg_flash_tween.tween_property(
+		set_body_height_button, "global_position", _gg_rest_position,
 		BODY_HEIGHT_SNAP_SEC
 	).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 	if flash:
-		_bh_flash_tween.tween_callback(_play_body_height_flash)
+		_gg_flash_tween.tween_callback(_play_body_height_flash)
 
 
 ## 颜色反馈：透明 → 彩色 → 保持 → 透明 → 直接回常态色
 func _play_body_height_flash() -> void:
-	if _bh_style == null:
+	if _gg_style == null:
 		return
 
-	if _bh_flash_tween != null and _bh_flash_tween.is_valid():
-		_bh_flash_tween.kill()
+	if _gg_flash_tween != null and _gg_flash_tween.is_valid():
+		_gg_flash_tween.kill()
 
-	var flash_color: Color = COLOR_ON if GROUND_BODY_HEIGHT else COLOR_OFF
+	var flash_color: Color = COLOR_ON if HAS_GAME_GROUND else COLOR_OFF
 	var transparent: Color = flash_color
 	transparent.a = 0.0
 
-	_bh_flash_tween = create_tween()
-	_bh_flash_tween.tween_property(_bh_style, "bg_color", flash_color, BODY_HEIGHT_FLASH_IN)
-	_bh_flash_tween.tween_interval(BODY_HEIGHT_FLASH_HOLD)
-	_bh_flash_tween.tween_property(_bh_style, "bg_color", transparent, BODY_HEIGHT_FLASH_OUT)
-	_bh_flash_tween.tween_callback(
-		func() -> void: _bh_style.bg_color = COLOR_BTN_NORMAL
+	_gg_flash_tween = create_tween()
+	_gg_flash_tween.tween_property(_gg_style, "bg_color", flash_color, BODY_HEIGHT_FLASH_IN)
+	_gg_flash_tween.tween_interval(BODY_HEIGHT_FLASH_HOLD)
+	_gg_flash_tween.tween_property(_gg_style, "bg_color", transparent, BODY_HEIGHT_FLASH_OUT)
+	_gg_flash_tween.tween_callback(
+		func() -> void: _gg_style.bg_color = COLOR_BTN_NORMAL
 	)
 
 
@@ -574,7 +574,7 @@ func _input(event: InputEvent) -> void:
 				return
 
 			# 拖动中不响应别的
-			if _bh_dragging:
+			if _gg_dragging:
 				return
 
 			if _dragging:
@@ -594,7 +594,7 @@ func _input(event: InputEvent) -> void:
 			return
 
 		# SetBodyHeight 抬起
-		if _bh_holding or _bh_dragging:
+		if _gg_holding or _gg_dragging:
 			_on_body_height_up()
 			return
 
@@ -607,10 +607,10 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventScreenDrag:
 		var drag := event as InputEventScreenDrag
 
-		_bh_last_pos = drag.position        # 始终记录 ✓
+		_gg_last_pos = drag.position        # 始终记录 ✓
 
 		# SetBodyHeight 拖动
-		if _bh_dragging:
+		if _gg_dragging:
 			_move_body_height_to(drag.position)
 			return
 
@@ -644,7 +644,7 @@ func _input(event: InputEvent) -> void:
 				_on_body_height_down(mouse.position)
 				return
 
-			if _bh_dragging:
+			if _gg_dragging:
 				return
 
 			if _dragging or not _is_stick_area_hit(mouse.position):
@@ -655,7 +655,7 @@ func _input(event: InputEvent) -> void:
 			_set_button_center(mouse.position)
 		else:
 			# SetBodyHeight 抬起
-			if _bh_holding or _bh_dragging:
+			if _gg_holding or _gg_dragging:
 				_on_body_height_up()
 				return
 
@@ -667,10 +667,10 @@ func _input(event: InputEvent) -> void:
 		if _touch_platform:
 			return
 
-		_bh_last_pos = (event as InputEventMouseMotion).position
+		_gg_last_pos = (event as InputEventMouseMotion).position
 
 		# SetBodyHeight 拖动（桌面测试用 ✓）
-		if _bh_dragging:
+		if _gg_dragging:
 			_move_body_height_to((event as InputEventMouseMotion).position)
 			return
 
