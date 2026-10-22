@@ -131,6 +131,10 @@ var _sg_rest_position: Vector2 = Vector2.ZERO
 ## 按钮专属的 StyleBoxFlat（必须 duplicate，否则会影响共用同一 SubResource 的其他按钮 ✗）
 var _sg_style: StyleBoxFlat = null
 ## 颜色反馈用的 Tween
+# 专门负责 SetGround 按钮的位置恢复
+var _sg_snap_tween: Tween = null
+
+# 专门负责 SetGround 按钮的颜色闪烁
 var _sg_flash_tween: Tween = null
 
 var _icon_no_ground: Texture2D = null
@@ -399,17 +403,19 @@ func _cancel_drag() -> void:
 
 
 ## 弹回固定位置（0.15s 补间）
+## 弹回固定位置（0.15s 补间）
+##   ⚠️ 用独立的 _sg_snap_tween ✓ 不能被颜色闪烁 kill 掉 ✗
 func _snap_back(flash: bool) -> void:
-	if _sg_flash_tween != null and _sg_flash_tween.is_valid():
-		_sg_flash_tween.kill()
+	if _sg_snap_tween != null and _sg_snap_tween.is_valid():
+		_sg_snap_tween.kill()
 
-	_sg_flash_tween = create_tween()
-	_sg_flash_tween.tween_property(
+	_sg_snap_tween = create_tween()
+	_sg_snap_tween.tween_property(
 		set_ground_button, "global_position", _sg_rest_position, SET_GROUND_SNAP_SEC
 	).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 	if flash:
-		_sg_flash_tween.tween_callback(_play_color_flash)
+		_sg_snap_tween.tween_callback(_play_color_flash)
 
 
 ## 颜色反馈：
