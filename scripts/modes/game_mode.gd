@@ -86,6 +86,8 @@ var _bh_dragging: bool = false
 var _bh_grab_offset: Vector2 = Vector2.ZERO
 ## 手指最新位置（长按满 2 秒时立刻用它对位 ✓）
 var _bh_last_pos: Vector2 = Vector2.ZERO
+## 2 秒长按是否完成
+var _bh_armed: bool = false
 var _bh_rest_position: Vector2 = Vector2.ZERO
 var _bh_style: StyleBoxFlat = null
 var _bh_flash_tween: Tween = null
@@ -260,8 +262,12 @@ func _apply_body_height_icon() -> void:
 func _on_body_height_down(grab_pos: Vector2) -> void:
 	_bh_holding = true
 	_bh_hold_time = 0.0
-	_bh_grab_offset = grab_pos - set_body_height_button.global_position
 	_bh_last_pos = grab_pos
+
+	# ★ 按下立刻进入拖动（马上跟随 ✓）
+	_bh_dragging = true
+	_bh_rest_position = set_body_height_button.global_position
+	set_body_height_button.global_position = grab_pos - set_body_height_button.size * 0.5
 
 
 func _on_body_height_up() -> void:
@@ -276,15 +282,17 @@ func _on_body_height_up() -> void:
 		set_body_height_button.global_position - _bh_rest_position
 	).length()
 
-	if moved >= BODY_HEIGHT_DRAG_DIST:
+	if _bh_armed and moved >= BODY_HEIGHT_DRAG_DIST:
 		_bh_dragging = false
+		_bh_armed = false
 		GROUND_BODY_HEIGHT = not GROUND_BODY_HEIGHT
 		print("[GameMode] GROUND_BODY_HEIGHT = ", GROUND_BODY_HEIGHT)
 		_apply_body_height_icon()
 		_bh_snap_back(true)
 	else:
 		_bh_dragging = false
-		print("[GameMode] SetBodyHeight 拖动取消（未满 300px）")
+		_bh_armed = false
+		print("[GameMode] SetBodyHeight 拖动取消（未满 300px 或未满 2 秒）")
 		_bh_snap_back(false)     # 只弹回，不闪烁、不改图标 ✗
 
 
@@ -303,8 +311,8 @@ func _tick_body_height_hold(delta: float) -> void:
 	_bh_dragging = true
 	_bh_rest_position = set_body_height_button.global_position
 
-	# ★ 照搬 MoveButton：圆心 = 手指 ✓
-	set_body_height_button.global_position = _bh_last_pos - set_body_height_button.size * 0.5
+	# 2 秒长按完成 → 解锁切换
+	_bh_armed = true
 
 	print("[GameMode] SetBodyHeight 进入拖动状态（拖满 300px 后松手切换）")
 
