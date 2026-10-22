@@ -4,8 +4,8 @@
 [ext_resource type="Texture2D" uid="uid://bau7raq6bi1n7" path="res://resources/RunSpeedOne.svg" id="1_xgdm1"]
 [ext_resource type="Texture2D" uid="uid://eoi3igsa6ygr" path="res://resources/GameRotateOne.svg" id="2_ws2n2"]
 [ext_resource type="Texture2D" uid="uid://cmoylqhtfes0v" path="res://resources/RunShaking.svg" id="3_5jln4"]
-[ext_resource type="Texture2D" uid="uid://bre45xdgqj61v" path="res://resources/NoCarGround.svg" id="4_5jln4"]
 [ext_resource type="Texture2D" uid="uid://cs7au3408w56n" path="res://resources/GameRun.svg" id="5_dim6h"]
+[ext_resource type="Texture2D" uid="uid://bc7262xpw1kvb" path="res://resources/NoBodyHeight.svg" id="6_0d70l"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_6t1vl"]
 bg_color = Color(0, 0, 0, 0.23529412)
@@ -167,7 +167,7 @@ theme_override_styles/pressed = SubResource("StyleBoxFlat_gsaqu")
 theme_override_styles/hover = SubResource("StyleBoxFlat_ycqn6")
 icon = ExtResource("3_5jln4")
 
-[node name="SetGameGround" type="Button" parent="." unique_id=78350824]
+[node name="SetBodyHeight" type="Button" parent="." unique_id=78350824]
 custom_minimum_size = Vector2(120, 120)
 layout_mode = 1
 anchors_preset = 2
@@ -181,4 +181,4 @@ grow_vertical = 0
 theme_override_styles/normal = SubResource("StyleBoxFlat_a6nh6")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_gsaqu")
 theme_override_styles/hover = SubResource("StyleBoxFlat_ycqn6")
-icon = ExtResource("4_5jln4")
+icon = ExtResource("6_0d70l")

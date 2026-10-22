@@ -278,28 +278,16 @@ func _update_set_ground_icon() -> void:
 
 ## 只在 unlink 状态显示
 ## LinkButton.button_pressed: true = unlink，false = link
+## SetGround 按钮现在始终显示 ✓
+##   之前只在 unlink 时显示 ✗ 原因是 unlink 会禁用 send_action ✗
+##   现在地面命令走 send_setting（不受门控 ✓）→ link / unlink 都能用 ✓
 func _update_set_ground_visibility() -> void:
 	if set_ground_button == null:
 		return
 
-	if _link_button == null:
-		_link_button = get_tree().root.find_child(
-			"LinkButton",
-			true,
-			false
-		)
-
-	if _link_button == null:
-		# 找不到 LinkButton 时保守隐藏，避免误操作
-		set_ground_button.visible = false
-		return
-
-	var unlinked: bool = bool(_link_button.get("button_pressed"))
-
-	if set_ground_button.visible != unlinked:
-		print("[CarMode][DBG] SetGround 可见性 → ", unlinked, "（unlink=", unlinked, "）")
-
-	set_ground_button.visible = unlinked
+	if not set_ground_button.visible:
+		set_ground_button.visible = true
+		print("[CarMode] SetGround 按钮始终显示")
 
 
 func _on_set_ground_button_down() -> void:
