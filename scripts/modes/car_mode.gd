@@ -122,8 +122,6 @@ var _sg_grab_offset: Vector2 = Vector2.ZERO
 var _sg_last_pos: Vector2 = Vector2.ZERO
 ## 正在操作 SetGround 的触点 id（照搬 MoveButton ✓）
 var _sg_pointer_id: int = -1
-## 2 秒长按是否完成（只有完成才允许切换 ✓ 防误触）
-var _sg_armed: bool = false
 var _sg_debug: bool = true
 ## 按钮的固定位置（拖动前记录）
 var _sg_rest_position: Vector2 = Vector2.ZERO
@@ -312,7 +310,6 @@ func _move_set_ground_to(global_pos: Vector2) -> void:
 ## 拖满 300px：弹回原位 + 切换状态 + 闪烁
 func _trigger_drag_toggle() -> void:
 	_sg_dragging = false
-	_sg_armed = false
 
 	print("[CarMode] SetGround 拖动完成 → 切换状态")
 
@@ -328,8 +325,7 @@ func _trigger_drag_toggle() -> void:
 ## 拖动取消（没拖够就松手）：弹回，不切换
 func _cancel_drag() -> void:
 	_sg_dragging = false
-	_sg_armed = false
-	print("[CarMode] SetGround 拖动取消（未满 300px 或未满 2 秒）")
+	print("[CarMode] SetGround 拖动取消（未满 300px）")
 	_snap_back(false)     # 只弹回，不闪烁、不改图标 ✗
 
 
@@ -408,12 +404,8 @@ func _update_set_ground_visibility() -> void:
 func _on_set_ground_button_down(grab_pos: Vector2) -> void:
 	_set_ground_holding = true
 	_set_ground_hold_time = 0.0
+	_sg_grab_offset = grab_pos - set_ground_button.global_position
 	_sg_last_pos = grab_pos
-
-	# ★ 按下立刻进入拖动状态（马上跟随手指 ✓）
-	_sg_dragging = true
-	_sg_rest_position = set_ground_button.global_position
-	set_ground_button.global_position = grab_pos - set_ground_button.size * 0.5
 
 
 func _on_set_ground_button_up() -> void:
@@ -428,7 +420,7 @@ func _on_set_ground_button_up() -> void:
 		set_ground_button.global_position - _sg_rest_position
 	).length()
 
-	if _sg_armed and moved >= SET_GROUND_DRAG_DIST:
+	if moved >= SET_GROUND_DRAG_DIST:
 		# 拖够了 → 切换 + 弹回 + 闪烁 ✓
 		_trigger_drag_toggle()
 	else:
@@ -454,8 +446,8 @@ func _tick_set_ground_hold(delta: float) -> void:
 	_sg_dragging = true
 	_sg_rest_position = set_ground_button.global_position
 
-	# 2 秒长按完成 → 解锁"松手可切换" ✓（此时早已在跟随）
-	_sg_armed = true
+	# ★ 完全照搬 MoveButton：圆心 = 手指 ✓
+	set_ground_button.global_position = _sg_last_pos - set_ground_button.size * 0.5
 
 	print("[CarMode] SetGround 进入拖动状态（拖满 300px 切换） pos=", _sg_last_pos)
 
