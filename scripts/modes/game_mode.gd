@@ -198,7 +198,7 @@ var _drag_pointer_id: int = -1
 @onready var run_speed_button: Button = $RunSpeed
 @onready var game_rotate_button: Button = $GameRotate
 @onready var run_shaking_button: Button = $RunShaking
-@onready var wall_collision_button: Button = get_node_or_null("WallCollision")
+@onready var wall_collision_button: Button = $WallCollision
 @onready var set_body_height_button: Button = $SetBodyHeight
 
 
@@ -241,7 +241,7 @@ func _ready() -> void:
 		run_shaking_button.expand_icon = true
 		_apply_run_shaking_icon()
 
-	# WallCollision：开关图标（按钮不存在时自动跳过 ✓）
+	# WallCollision：开关图标
 	if wall_collision_button != null:
 		wall_collision_button.focus_mode = Control.FOCUS_NONE
 		wall_collision_button.expand_icon = true
