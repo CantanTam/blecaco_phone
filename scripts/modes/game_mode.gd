@@ -757,6 +757,12 @@ func _input(event: InputEvent) -> void:
 				_on_body_height_down(touch.position)
 				return
 
+			# ★ 视角控制优先（多指：左手摇杆 + 右手视角 ✓）
+			#   必须排在 "摇杆拖动中就 return" 之前 ✗
+			if _look_pointer_id == -1 and _should_start_look(touch.position):
+				_start_look(touch.index, touch.position)
+				return
+
 			# 拖动中不响应别的
 			if _gg_dragging:
 				return
