@@ -598,6 +598,14 @@ func _input(event: InputEvent) -> void:
 				_cycle_run_speed()
 				return
 
+			# SetBodyHeight 按下（桌面测试用 ✓）
+			if _is_body_height_hit(mouse.position):
+				_on_body_height_down(mouse.position)
+				return
+
+			if _bh_dragging:
+				return
+
 			if _dragging or not _is_stick_area_hit(mouse.position):
 				return
 
@@ -605,12 +613,22 @@ func _input(event: InputEvent) -> void:
 			_drag_pointer_id = -1
 			_set_button_center(mouse.position)
 		else:
+			# SetBodyHeight 抬起
+			if _bh_holding or _bh_dragging:
+				_on_body_height_up()
+				return
+
 			if _dragging and _drag_pointer_id == -1:
 				_reset_button()
 		return
 
 	if event is InputEventMouseMotion:
 		if _touch_platform:
+			return
+
+		# SetBodyHeight 拖动（桌面测试用 ✓）
+		if _bh_dragging:
+			_move_body_height_to((event as InputEventMouseMotion).position)
 			return
 
 		var motion := event as InputEventMouseMotion
