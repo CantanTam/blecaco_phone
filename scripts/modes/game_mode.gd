@@ -537,10 +537,8 @@ func _tick_body_height_hold(delta: float) -> void:
 	_gg_holding = false
 	_gg_hold_time = 0.0
 
-	# 相机下方没有物体 → 不能拖动 ✓（与 car_mode 一致 ✓）
-	if not _gg_has_surface:
-		print("[GameMode] 相机下方没有物体 → SetBodyHeight 无法拖动")
-		return
+	# ⚠️ 不再拦截"下方无物体"✗
+	#   无物体时由 Blender 决定：用 X-Y 平面 / 沿用旧值 / 直接失效 ✓
 
 	# 与 car_mode 完全一致：进入拖动时再记录一次 ✓
 	_gg_dragging = true
