@@ -21,6 +21,14 @@ const COLOR_ON := Color("00d455ff")
 const COLOR_OFF := Color("ff5555ff")
 const COLOR_BTN_NORMAL := Color("000000a0")
 
+## ── 右侧视角控制（FPS 式）──────────────────────────
+## 指尖相对落点的归一化半径（超过就满速旋转）
+const LOOK_RADIUS: float = 200.0
+
+var _look_pointer_id: int = -1
+var _look_center: Vector2 = Vector2.ZERO
+var _look_vector: Vector2 = Vector2.ZERO      # x 右为正 / y 下为正，长度 ≤ 1
+
 ## 摇杆归一化半径（位移 / 此值 = -1..1）
 const STICK_LIMIT_RADIUS: float = 250.0
 
@@ -281,6 +289,60 @@ func _is_run_speed_hit(viewport_position: Vector2) -> bool:
 # SetBodyHeight：长按 → 拖动 → 松手判定 → 切换 + 弹回 + 闪烁
 # 交互逻辑与 car_mode 的 SetGround 一致 ✓
 # ============================================================
+
+## 落点是否应该进入"视角控制"（横屏右半屏、且不在其他按钮上）
+func _should_start_look(viewport_position: Vector2) -> bool:
+	if not is_landscape_ui():
+		return viewport_position.x > get_viewport_rect().size.x * 0.5
+
+	# 横屏：右半屏
+	if viewport_position.x < get_viewport_rect().size.x * 0.5:
+		return false
+
+	# 排除其他按钮
+	if _is_run_speed_hit(viewport_position):
+		return false
+	if _is_body_height_hit(viewport_position):
+		return false
+	if _is_in_forward_area(viewport_position):
+		return false
+	if _is_stick_area_hit(viewport_position):
+		return false
+
+	return true
+
+
+## 是否横屏（宽 > 高）
+func is_landscape_ui() -> bool:
+	var sz: Vector2 = get_viewport_rect().size
+	return sz.x > sz.y
+
+
+## 开始视角控制：落点作为圆心 A ✓
+func _start_look(pointer_id: int, position: Vector2) -> void:
+	_look_pointer_id = pointer_id
+	_look_center = position
+	_look_vector = Vector2.ZERO
+	print("[GameMode] 开始视角控制 index=", pointer_id, " 圆心=", position)
+
+
+func _stop_look() -> void:
+	_look_pointer_id = -1
+	_look_vector = Vector2.ZERO
+
+
+## 拖动 → 计算归一化向量（方向 = 夹角 ✓ 大小 = 距离 ✓）
+func _update_look(position: Vector2) -> void:
+	var delta: Vector2 = position - _look_center
+	var distance: float = delta.length()
+
+	if distance < 1e-5:
+		_look_vector = Vector2.ZERO
+		return
+
+	var magnitude: float = minf(distance / LOOK_RADIUS, 1.0)
+	_look_vector = (delta / distance) * magnitude
+
 
 ## 是否正在移动（摇杆有输出 ✓ 对标 car_mode 的 _is_forward_pressed）
 func _is_game_moving() -> bool:
@@ -651,6 +713,8 @@ func _process(delta: float) -> void:
 			"ry": _stick_vector.y,
 			"sprint": _sprinting,
 			"run_multiplier": _sprint_multiplier,
+			"look_x": _look_vector.x,
+			"look_y": _look_vector.y,
 		}
 	)
 
@@ -682,6 +746,9 @@ func _input(event: InputEvent) -> void:
 
 			# 只有落在 MoveButton 内才开始拖动
 			if not _is_stick_area_hit(touch.position):
+				# 不摇杆 → 试试视角控制 ✓
+				if _look_pointer_id == -1 and _should_start_look(touch.position):
+					_start_look(touch.index, touch.position)
 				return
 
 			_dragging = true
@@ -691,6 +758,11 @@ func _input(event: InputEvent) -> void:
 			_set_button_center(touch.position)
 
 			print("[GameMode] 开始拖动 index=", touch.index, " pos=", touch.position)
+			return
+
+		# 视角控制抬起
+		if touch.index == _look_pointer_id:
+			_stop_look()
 			return
 
 		# SetBodyHeight 抬起
@@ -706,6 +778,11 @@ func _input(event: InputEvent) -> void:
 
 	if event is InputEventScreenDrag:
 		var drag := event as InputEventScreenDrag
+
+		# 视角控制拖动
+		if drag.index == _look_pointer_id:
+			_update_look(drag.position)
+			return
 
 		_gg_last_pos = drag.position        # 始终记录 ✓
 
