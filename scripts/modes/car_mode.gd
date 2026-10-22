@@ -290,16 +290,14 @@ func _on_ground_status_message(message: String) -> void:
 ## Blender 推送：移动中相机脚下第一个物体是否带 is_ground
 ##   变化时 → 切图标 + 闪一下（绿=有 / 红=无）
 func _on_ground_indicator_message(message: String) -> void:
-	var _d: Variant = JSON.parse_string(message)
-	if _d is Dictionary and _d.get("type") == "ground_indicator":
-		_has_surface = bool(_d.get("has_surface", false))
-
-func _on_ground_indicator_message(message: String) -> void:
 	var data: Variant = JSON.parse_string(message)
 	if not (data is Dictionary):
 		return
 	if data.get("type") != "ground_indicator":
 		return
+
+	# 相机下方是否有物体（长按 SetGround 的前置条件 ✓）
+	_has_surface = bool(data.get("has_surface", false))
 
 	var has_ground: bool = bool(data.get("has_ground", false))
 
