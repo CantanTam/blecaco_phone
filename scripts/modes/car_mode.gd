@@ -756,17 +756,7 @@ func _input(event: InputEvent) -> void:
 			_on_set_ground_button_up()
 			return
 
-	# 拖动中：手指移动 → 按钮跟随
-	if event is InputEventScreenDrag:
-		if _sg_dragging:
-			_move_set_ground_to((event as InputEventScreenDrag).position)
-		return
-
-	if event is InputEventMouseMotion:
-		if _sg_dragging and not _touch_platform:
-			_move_set_ground_to((event as InputEventMouseMotion).position)
-		return
-
+		# ZoomFit / SteerSensitivity 照旧 ✓（必须在 ScreenTouch 分支里）
 		if event.pressed and _is_zoom_fit_hit(event.position):
 			_toggle_zoom_fit()
 			get_viewport().set_input_as_handled()
@@ -776,6 +766,17 @@ func _input(event: InputEvent) -> void:
 			_cycle_steer_sensitivity()
 			get_viewport().set_input_as_handled()
 
+		return
+
+	# 拖动中：手指移动 → 按钮跟随（独立分支 ✓）
+	if event is InputEventScreenDrag:
+		if _sg_dragging:
+			_move_set_ground_to((event as InputEventScreenDrag).position)
+		return
+
+	if event is InputEventMouseMotion:
+		if _sg_dragging and not _touch_platform:
+			_move_set_ground_to((event as InputEventMouseMotion).position)
 		return
 
 	if event is InputEventMouseButton:
