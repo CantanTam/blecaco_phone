@@ -48,6 +48,10 @@ const ICON_ROTATE_SPEED := {
 	0: "res://resources/GameRotateThree.svg",
 }
 
+## ── RunShaking 开关图标 ──────────────────────────────
+const ICON_RUN_SHAKING_ON: String = "res://resources/RunShaking.svg"
+const ICON_RUN_SHAKING_OFF: String = "res://resources/NoRunShaking.svg"
+
 ## 摇杆归一化半径（位移 / 此值 = -1..1）
 const STICK_LIMIT_RADIUS: float = 250.0
 
@@ -105,6 +109,9 @@ var RUN_SPEED: int = 1
 
 ## 视角灵敏度档位计数（每次点击 +1，图标由 % 3 决定）
 var ROTATE_SPEED: int = 2
+
+## 奔跑抖动开关（默认开）
+var RUN_SHAKING: bool = true
 
 ## Blender 推来的脚下状态（与 car_mode 同款 ✓）
 func _on_ground_indicator_message(message: String) -> void:
@@ -183,6 +190,7 @@ var _drag_pointer_id: int = -1
 @onready var game_run_notice: Panel = $GameRunNotice
 @onready var run_speed_button: Button = $RunSpeed
 @onready var game_rotate_button: Button = $GameRotate
+@onready var run_shaking_button: Button = $RunShaking
 @onready var set_body_height_button: Button = $SetBodyHeight
 
 
@@ -218,6 +226,12 @@ func _ready() -> void:
 		game_rotate_button.focus_mode = Control.FOCUS_NONE
 		game_rotate_button.expand_icon = true
 		_apply_rotate_speed_icon()
+
+	# RunShaking：开关图标
+	if run_shaking_button != null:
+		run_shaking_button.focus_mode = Control.FOCUS_NONE
+		run_shaking_button.expand_icon = true
+		_apply_run_shaking_icon()
 
 	# SetBodyHeight：复制专属样式 + 记录原位 + 初始图标
 	if set_body_height_button != null:
@@ -258,6 +272,35 @@ func _ready() -> void:
 		" Connection=",
 		connection_node != null
 	)
+
+
+## 按 RUN_SHAKING 更新图标
+func _apply_run_shaking_icon() -> void:
+	if run_shaking_button == null:
+		return
+
+	var path: String = ICON_RUN_SHAKING_ON if RUN_SHAKING else ICON_RUN_SHAKING_OFF
+
+	if not ResourceLoader.exists(path):
+		print("[GameMode] RunShaking 图标缺失：", path)
+		return
+
+	run_shaking_button.icon = load(path)
+	run_shaking_button.expand_icon = true
+
+
+## RunShaking 被点击：取反
+func _toggle_run_shaking() -> void:
+	RUN_SHAKING = not RUN_SHAKING
+	_apply_run_shaking_icon()
+	print("[GameMode] RUN_SHAKING = ", RUN_SHAKING)
+
+
+## 屏幕坐标是否落在 RunShaking 上
+func _is_run_shaking_hit(viewport_position: Vector2) -> bool:
+	if run_shaking_button == null or not run_shaking_button.is_visible_in_tree():
+		return false
+	return run_shaking_button.get_global_rect().has_point(viewport_position)
 
 
 ## 按 ROTATE_SPEED % 3 更新灵敏度图标
@@ -811,6 +854,11 @@ func _input(event: InputEvent) -> void:
 			# GameRotate：切视角灵敏度
 			if _is_game_rotate_hit(touch.position):
 				_cycle_rotate_speed()
+				return
+
+			# RunShaking：开关
+			if _is_run_shaking_hit(touch.position):
+				_toggle_run_shaking()
 				return
 
 			# SetBodyHeight 按下 → 开始长按计时
