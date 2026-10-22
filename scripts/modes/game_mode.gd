@@ -76,8 +76,32 @@ var _stick_vector: Vector2 = Vector2.ZERO
 ## RunSpeed 档位计数：每次点击 +1，图标由 RUN_SPEED % 3 决定
 var RUN_SPEED: int = 1
 
+## Blender 推来的脚下状态（与 car_mode 同款 ✓）
+func _on_ground_indicator_message(message: String) -> void:
+	var data: Variant = JSON.parse_string(message)
+	if not (data is Dictionary):
+		return
+	if data.get("type") != "ground_indicator":
+		return
+
+	_gg_has_surface = bool(data.get("has_surface", false))
+
+	# 图标 + 闪色跟随脚下状态 ✓
+	var has_ground: bool = bool(data.get("has_ground", false))
+
+	if has_ground == HAS_GAME_GROUND:
+		return
+
+	HAS_GAME_GROUND = has_ground
+	_apply_body_height_icon()
+	_play_body_height_flash()
+
+
 ## 地面人物高度开关
 var HAS_GAME_GROUND: bool = false
+
+## 相机 -Y 下方是否有物体（Blender 每 100ms 推 ✓）
+var _gg_has_surface: bool = false
 
 ## SetBodyHeight 交互状态
 var _gg_holding: bool = false
@@ -167,6 +191,16 @@ func _ready() -> void:
 
 	# 找 Blender 连接节点
 	connection_node = get_tree().root.find_child(CONNECTION_NODE_NAME, true, false)
+
+	# 接收脚下状态推送
+	if connection_node != null and is_instance_valid(connection_node):
+		if connection_node.has_signal("text_message_received"):
+			if not connection_node.text_message_received.is_connected(
+				_on_ground_indicator_message
+			):
+				connection_node.text_message_received.connect(
+					_on_ground_indicator_message
+				)
 
 	print(
 		"[GameMode] 就绪：MoveStickArea 圆心=",
@@ -285,6 +319,12 @@ func _on_body_height_up() -> void:
 		_gg_dragging = false
 		HAS_GAME_GROUND = not HAS_GAME_GROUND
 		print("[GameMode] HAS_GAME_GROUND = ", HAS_GAME_GROUND)
+
+		# 通知 Blender 建立/清除 is_ground 标记 ✓
+		if connection_node != null and is_instance_valid(connection_node):
+			connection_node.call(
+				"send_setting", "ground", HAS_GAME_GROUND
+			)
 		_apply_body_height_icon()
 		_gg_snap_back(true)
 	else:
@@ -312,6 +352,12 @@ func _tick_body_height_hold(delta: float) -> void:
 
 	_gg_holding = false
 	_gg_hold_time = 0.0
+
+	# 相机下方没有物体 → 不能拖动 ✓（与 car_mode 一致 ✓）
+	if not _gg_has_surface:
+		print("[GameMode] 相机下方没有物体 → SetBodyHeight 无法拖动")
+		return
+
 	_gg_dragging = true
 	_gg_rest_position = set_body_height_button.global_position
 
