@@ -301,10 +301,8 @@ func _tick_body_height_hold(delta: float) -> void:
 	_bh_dragging = true
 	_bh_rest_position = set_body_height_button.global_position
 
-	# ★ 立刻让按钮【圆心】对到手指（不等下一次拖动事件 ✓）
-	#   把抓取偏移改成半个按钮尺寸 → 圆心 = 手指 ✓
-	_bh_grab_offset = set_body_height_button.size * 0.5
-	set_body_height_button.global_position = _bh_last_pos - _bh_grab_offset
+	# ★ 照搬 MoveButton：圆心 = 手指 ✓
+	set_body_height_button.global_position = _bh_last_pos - set_body_height_button.size * 0.5
 
 	print("[GameMode] SetBodyHeight 进入拖动状态（拖满 300px 后松手切换）")
 
@@ -314,7 +312,7 @@ func _move_body_height_to(global_pos: Vector2) -> void:
 	if not _bh_dragging:
 		return
 
-	set_body_height_button.global_position = global_pos - _bh_grab_offset
+	set_body_height_button.global_position = global_pos - set_body_height_button.size * 0.5
 
 
 ## 弹回原位（0.15s BACK 缓动）→ 完成后闪烁

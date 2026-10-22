@@ -446,10 +446,8 @@ func _tick_set_ground_hold(delta: float) -> void:
 	_sg_dragging = true
 	_sg_rest_position = set_ground_button.global_position
 
-	# ★ 立刻让按钮【圆心】对到手指（不等下一次拖动事件 ✓）
-	#   把抓取偏移改成半个按钮尺寸 → 圆心 = 手指 ✓
-	_sg_grab_offset = set_ground_button.size * 0.5
-	set_ground_button.global_position = _sg_last_pos - _sg_grab_offset
+	# ★ 完全照搬 MoveButton：圆心 = 手指 ✓
+	set_ground_button.global_position = _sg_last_pos - set_ground_button.size * 0.5
 
 	print("[CarMode] SetGround 进入拖动状态（拖满 300px 切换） pos=", _sg_last_pos)
 
@@ -787,7 +785,8 @@ func _input(event: InputEvent) -> void:
 		_sg_last_pos = sd.position
 
 		if _sg_dragging:
-			set_ground_button.global_position = sd.position - _sg_grab_offset
+			# 照搬 MoveButton：圆心 = 手指 ✓
+			set_ground_button.global_position = sd.position - set_ground_button.size * 0.5
 
 			if _sg_debug:
 				print("[CarMode][SG] 跟随 ", sd.position, " → ", set_ground_button.global_position)
@@ -795,7 +794,8 @@ func _input(event: InputEvent) -> void:
 
 	if event is InputEventMouseMotion:
 		if _sg_dragging and not _touch_platform:
-			_move_set_ground_to((event as InputEventMouseMotion).position)
+			var mp: Vector2 = (event as InputEventMouseMotion).position
+			set_ground_button.global_position = mp - set_ground_button.size * 0.5
 		return
 
 	if event is InputEventMouseButton:
