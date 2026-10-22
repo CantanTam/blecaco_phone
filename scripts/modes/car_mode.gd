@@ -120,6 +120,9 @@ var _sg_dragging: bool = false
 var _sg_grab_offset: Vector2 = Vector2.ZERO
 ## 手指最新位置（长按满 2 秒时立刻用它对位 ✓）
 var _sg_last_pos: Vector2 = Vector2.ZERO
+## 正在操作 SetGround 的触点 id（照搬 MoveButton ✓）
+var _sg_pointer_id: int = -1
+var _sg_debug: bool = true
 ## 按钮的固定位置（拖动前记录）
 var _sg_rest_position: Vector2 = Vector2.ZERO
 ## 按钮专属的 StyleBoxFlat（必须 duplicate，否则会影响共用同一 SubResource 的其他按钮 ✗）
@@ -448,7 +451,7 @@ func _tick_set_ground_hold(delta: float) -> void:
 	_sg_grab_offset = set_ground_button.size * 0.5
 	set_ground_button.global_position = _sg_last_pos - _sg_grab_offset
 
-	print("[CarMode] SetGround 进入拖动状态（拖满 300px 切换）")
+	print("[CarMode] SetGround 进入拖动状态（拖满 300px 切换） pos=", _sg_last_pos)
 
 
 func _ready() -> void:
@@ -781,9 +784,13 @@ func _input(event: InputEvent) -> void:
 	# 拖动中：手指移动 → 按钮跟随（独立分支 ✓）
 	if event is InputEventScreenDrag:
 		var sd := event as InputEventScreenDrag
-		_sg_last_pos = sd.position          # 始终记录 ✓
+		_sg_last_pos = sd.position
+
 		if _sg_dragging:
-			_move_set_ground_to(sd.position)
+			set_ground_button.global_position = sd.position - _sg_grab_offset
+
+			if _sg_debug:
+				print("[CarMode][SG] 跟随 ", sd.position, " → ", set_ground_button.global_position)
 		return
 
 	if event is InputEventMouseMotion:
