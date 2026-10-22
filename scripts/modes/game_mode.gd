@@ -84,9 +84,18 @@ func _on_ground_indicator_message(message: String) -> void:
 	if data.get("type") != "ground_indicator":
 		return
 
-	# 只取 has_surface（长按前置条件 ✓）
-	# ⚠️ 不用它改 HAS_GAME_GROUND ✗ 那是"开关状态"，只能由用户长按切换 ✓
+	# 长按前置条件 ✓
 	_gg_has_surface = bool(data.get("has_surface", false))
+
+	# 脚下状态（与 car_mode 一致 ✓）：变化时切图标 + 闪绿/红
+	var has_ground: bool = bool(data.get("has_ground", false))
+
+	if _gg_indicator_state != null and bool(_gg_indicator_state) == has_ground:
+		return
+
+	_gg_indicator_state = has_ground
+	_apply_body_height_icon_for(has_ground)
+	_gg_play_flash_for(has_ground)
 
 
 ## 地面人物高度开关
@@ -94,6 +103,10 @@ var HAS_GAME_GROUND: bool = false
 
 ## 相机 -Y 下方是否有物体（Blender 每 100ms 推 ✓）
 var _gg_has_surface: bool = false
+
+## 脚下状态的独立缓存（null = 还没收到过）
+## ⚠️ 与 HAS_GAME_GROUND 分开 ✗：那个是"开关"，这个是"脚下"
+var _gg_indicator_state: Variant = null
 
 ## SetBodyHeight 交互状态
 var _gg_holding: bool = false
@@ -272,6 +285,41 @@ func _is_body_height_hit(viewport_position: Vector2) -> bool:
 	if set_body_height_button == null or not set_body_height_button.is_visible_in_tree():
 		return false
 	return set_body_height_button.get_global_rect().has_point(viewport_position)
+
+
+## 按指定状态更新图标（脚下指示用 ✓）
+func _apply_body_height_icon_for(has_ground: bool) -> void:
+	if set_body_height_button == null:
+		return
+
+	var path: String = ICON_BODY_HEIGHT_ON if has_ground else ICON_BODY_HEIGHT_OFF
+
+	if not ResourceLoader.exists(path):
+		return
+
+	set_body_height_button.icon = load(path)
+	set_body_height_button.expand_icon = true
+
+
+## 按指定状态闪色（脚下指示用 ✓）
+func _gg_play_flash_for(has_ground: bool) -> void:
+	if _gg_style == null:
+		return
+
+	if _gg_flash_tween != null and _gg_flash_tween.is_valid():
+		_gg_flash_tween.kill()
+
+	var flash_color: Color = COLOR_ON if has_ground else COLOR_OFF
+	var transparent: Color = flash_color
+	transparent.a = 0.0
+
+	_gg_flash_tween = create_tween()
+	_gg_flash_tween.tween_property(_gg_style, "bg_color", flash_color, BODY_HEIGHT_FLASH_IN)
+	_gg_flash_tween.tween_interval(BODY_HEIGHT_FLASH_HOLD)
+	_gg_flash_tween.tween_property(_gg_style, "bg_color", transparent, BODY_HEIGHT_FLASH_OUT)
+	_gg_flash_tween.tween_callback(
+		func() -> void: _gg_style.bg_color = COLOR_BTN_NORMAL
+	)
 
 
 func _apply_body_height_icon() -> void:
