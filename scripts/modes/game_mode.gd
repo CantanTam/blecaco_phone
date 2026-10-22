@@ -837,6 +837,7 @@ func _process(delta: float) -> void:
 			"look_dx": send_dx,
 			"look_dy": send_dy,
 			"look_multiplier": _rotate_speed_multiplier(),
+			"run_shaking": RUN_SHAKING,
 		}
 	)
 
