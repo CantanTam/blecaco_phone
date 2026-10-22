@@ -279,11 +279,11 @@ func _on_body_height_up() -> void:
 		GROUND_BODY_HEIGHT = not GROUND_BODY_HEIGHT
 		print("[GameMode] GROUND_BODY_HEIGHT = ", GROUND_BODY_HEIGHT)
 		_apply_body_height_icon()
-		_bh_snap_back()
+		_bh_snap_back(true)
 	else:
 		_bh_dragging = false
 		print("[GameMode] SetBodyHeight 拖动取消（未满 300px）")
-		_bh_snap_back()
+		_bh_snap_back(false)     # 只弹回，不闪烁、不改图标 ✗
 
 
 ## 长按计时：满 2 秒进入拖动状态
@@ -318,7 +318,7 @@ func _move_body_height_to(global_pos: Vector2) -> void:
 
 
 ## 弹回原位（0.15s BACK 缓动）→ 完成后闪烁
-func _bh_snap_back() -> void:
+func _bh_snap_back(flash: bool) -> void:
 	if _bh_flash_tween != null and _bh_flash_tween.is_valid():
 		_bh_flash_tween.kill()
 
@@ -327,7 +327,9 @@ func _bh_snap_back() -> void:
 		set_body_height_button, "global_position", _bh_rest_position,
 		BODY_HEIGHT_SNAP_SEC
 	).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	_bh_flash_tween.tween_callback(_play_body_height_flash)
+
+	if flash:
+		_bh_flash_tween.tween_callback(_play_body_height_flash)
 
 
 ## 颜色反馈：透明 → 彩色 → 保持 → 透明 → 直接回常态色

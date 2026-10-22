@@ -316,18 +316,18 @@ func _trigger_drag_toggle() -> void:
 	else:
 		_send_ground_command(true)
 
-	_snap_back()      # 弹回后会通过 tween_callback 触发闪烁 ✓
+	_snap_back(true)      # 弹回 + 闪烁 ✓
 
 
 ## 拖动取消（没拖够就松手）：弹回，不切换
 func _cancel_drag() -> void:
 	_sg_dragging = false
 	print("[CarMode] SetGround 拖动取消（未满 300px）")
-	_snap_back()
+	_snap_back(false)     # 只弹回，不闪烁、不改图标 ✗
 
 
 ## 弹回固定位置（0.15s 补间）
-func _snap_back() -> void:
+func _snap_back(flash: bool) -> void:
 	if _sg_flash_tween != null and _sg_flash_tween.is_valid():
 		_sg_flash_tween.kill()
 
@@ -335,7 +335,9 @@ func _snap_back() -> void:
 	_sg_flash_tween.tween_property(
 		set_ground_button, "global_position", _sg_rest_position, SET_GROUND_SNAP_SEC
 	).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	_sg_flash_tween.tween_callback(_play_color_flash)
+
+	if flash:
+		_sg_flash_tween.tween_callback(_play_color_flash)
 
 
 ## 颜色反馈：
