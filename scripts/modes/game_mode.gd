@@ -314,8 +314,9 @@ func _on_body_height_up() -> void:
 
 		# 通知 Blender 建立/清除 is_ground 标记 ✓
 		if connection_node != null and is_instance_valid(connection_node):
+			# ⚠️ 用 "game_ground" ✗ 不能用 "ground"（那会被转给 car_action ✗）
 			connection_node.call(
-				"send_setting", "ground", HAS_GAME_GROUND
+				"send_setting", "game_ground", HAS_GAME_GROUND
 			)
 		_apply_body_height_icon()
 		_gg_snap_back(true)
