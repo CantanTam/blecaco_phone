@@ -118,6 +118,10 @@ var _gg_last_pos: Vector2 = Vector2.ZERO
 var _gg_rest_position: Vector2 = Vector2.ZERO
 
 var _gg_style: StyleBoxFlat = null
+# 专门负责 SetBodyHeight 按钮的位置恢复
+var _gg_snap_tween: Tween = null
+
+# 专门负责 SetBodyHeight 按钮的颜色闪烁
 var _gg_flash_tween: Tween = null
 
 ## 是否为触摸设备（真机上触摸会产生【模拟鼠标事件】✗ 必须跳过 ✗）
@@ -432,18 +436,24 @@ func _on_body_height_up_cancel() -> void:
 
 
 ## 弹回原位（0.15s BACK 缓动）→ 完成后闪烁
+## 弹回原位（0.15s BACK 缓动）→ 完成后闪烁
 func _gg_snap_back(flash: bool) -> void:
-	if _gg_flash_tween != null and _gg_flash_tween.is_valid():
-		_gg_flash_tween.kill()
+	# 只终止上一次的位置恢复动画
+	if _gg_snap_tween != null and _gg_snap_tween.is_valid():
+		_gg_snap_tween.kill()
 
-	_gg_flash_tween = create_tween()
-	_gg_flash_tween.tween_property(
-		set_body_height_button, "global_position", _gg_rest_position,
+	# 使用独立 Tween，避免颜色闪烁中断位置恢复 ✓
+	_gg_snap_tween = create_tween()
+	_gg_snap_tween.tween_property(
+		set_body_height_button,
+		"global_position",
+		_gg_rest_position,
 		BODY_HEIGHT_SNAP_SEC
 	).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
+	# 位置恢复完成后，再播放颜色反馈
 	if flash:
-		_gg_flash_tween.tween_callback(_play_body_height_flash)
+		_gg_snap_tween.tween_callback(_play_body_height_flash)
 
 
 ## 颜色反馈：透明 → 彩色 → 保持 → 透明 → 直接回常态色
