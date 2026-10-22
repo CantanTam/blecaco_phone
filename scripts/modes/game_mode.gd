@@ -160,6 +160,8 @@ func _ready() -> void:
 			set_body_height_button.add_theme_stylebox_override("normal", _bh_style)
 			_bh_style.bg_color = COLOR_BTN_NORMAL
 
+		set_body_height_button.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
 		_bh_rest_position = set_body_height_button.global_position
 		_apply_body_height_icon()
 

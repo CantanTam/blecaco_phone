@@ -513,6 +513,10 @@ func _ready() -> void:
 			set_ground_button.add_theme_stylebox_override("normal", _sg_style)
 			_sg_style.bg_color = COLOR_SET_GROUND_NORMAL
 
+		# 照搬 drone_mode 的 Roll/Stick 按钮：忽略自己的鼠标事件，
+		# 全部交给 _input 手动处理 ✓（否则 Button 的 gui_input 会吞掉拖动 ✗）
+		set_ground_button.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
 		_sg_rest_position = set_ground_button.global_position
 
 	_update_set_ground_icon()
