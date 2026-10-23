@@ -275,6 +275,12 @@ func _deadzone(value: float) -> float:
 	return 0.0 if absf(value) < FLOW_DEADZONE_PX else value
 
 
+## 与 free_mode 共用 addon_set 的全局移动倍数（Options: move_speed）。
+## 光流的 x/y/radial 都是平移分量（radial = 前后），所以三轴一起乘。
+func _move_scale() -> float:
+	return maxf(0.0, Options.get_float("move_speed"))
+
+
 func _send_translation(motion: Vector2, radial: float) -> void:
 	if connection_node == null:
 		return
@@ -285,11 +291,13 @@ func _send_translation(motion: Vector2, radial: float) -> void:
 	if not connection_node.has_method("send_action"):
 		return
 
+	var move_scale: float = _move_scale()
+
 	connection_node.call("send_action", "free", {
 		"command": "translation",
-		"x": motion.x,
-		"y": motion.y,
-		"radial": radial
+		"x": motion.x * move_scale,
+		"y": motion.y * move_scale,
+		"radial": radial * move_scale
 	})
 
 

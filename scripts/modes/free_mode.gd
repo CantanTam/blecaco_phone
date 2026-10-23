@@ -127,6 +127,12 @@ func _send_rate() -> float:
 	)
 
 
+## addon_set 的全局移动倍数（Options: move_speed，默认 1.0）。
+## Free 只缩放平移（光流/OpenVINS），不缩放旋转。
+func _move_scale() -> float:
+	return maxf(0.0, Options.get_float("move_speed"))
+
+
 func _ready() -> void:
 	_touch_platform = (
 		DisplayServer.is_touchscreen_available()
@@ -441,6 +447,9 @@ func _send_openvins_translation() -> void:
 	var step_cam := _openvins_step(p, q)
 	if step_cam == Vector3.ZERO:
 		return   # 没动（或在死区内攒着）
+
+	# 全局移动倍数只乘平移（米），不乘旋转
+	step_cam = step_cam * _move_scale()
 
 	connection_node.call("send_action", "free", {
 		"command": "translation",
