@@ -134,3 +134,17 @@ offset_bottom = 880.0
 theme_override_styles/normal = SubResource("StyleBoxFlat_qnk50")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_sec1p")
 theme_override_styles/hover = SubResource("StyleBoxFlat_a6nh6")
+
+[node name="CarCollision" type="Button" parent="." unique_id=416949427]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -160.0
+offset_top = 200.0
+offset_right = -40.0
+offset_bottom = 320.0
+grow_horizontal = 0
+theme_override_styles/normal = SubResource("StyleBoxFlat_qnk50")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_sec1p")
+theme_override_styles/hover = SubResource("StyleBoxFlat_a6nh6")

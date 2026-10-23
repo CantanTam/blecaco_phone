@@ -95,6 +95,12 @@ const ICON_NO_GROUND: String = "res://resources/NoCarGround.svg"
 const ICON_HAS_GROUND: String = "res://resources/HasCarGround.svg"
 const SET_GROUND_HOLD_SEC: float = 2.0
 
+# ── CarCollision：车辆防撞开关 ──────────────────────────
+# 按钮 120×120，沿用 WallCollision 的 120px 图标（不共用变量/状态）
+const ICON_CAR_COLLISION_ON: String = "res://resources/WallCollision.svg"
+const ICON_CAR_COLLISION_OFF: String = "res://resources/NoWallCollision.svg"
+var CAR_COLLISION: bool = true
+
 # ── SetGround 拖动切换 ──────────────────────────────────
 ## 长按成功后进入拖动状态，拖满这个距离才切换（防误触 ✓）
 const SET_GROUND_DRAG_DIST: float = 300.0
@@ -139,6 +145,12 @@ var _sg_flash_tween: Tween = null
 
 var _icon_no_ground: Texture2D = null
 var _icon_has_ground: Texture2D = null
+
+# CarCollision 的触摸/鼠标占用状态：按住按钮时前进区暂时失效
+var _car_collision_pointer: int = -1
+var _car_collision_mouse: bool = false
+var _icon_car_collision_on: Texture2D = null
+var _icon_car_collision_off: Texture2D = null
 var _set_ground_holding: bool = false
 var _set_ground_hold_time: float = 0.0
 var _link_button: Node = null
@@ -169,6 +181,7 @@ var connection_node: Node = null
 @onready var zoom_fit_button: Button = $ZoomFit
 @onready var steer_sensitivity_button: Button = $SteerSensitivity
 @onready var set_ground_button: Button = $SetGround
+@onready var car_collision_button: Button = $CarCollision
 @onready var forward_area: Node = (
 	get_node_or_null("CarForwardArea")
 )
@@ -608,6 +621,21 @@ func _ready() -> void:
 
 		_sg_rest_position = set_ground_button.global_position
 
+	# CarCollision：加载图标 + 手动 _input 命中（不用 Button.pressed）
+	if ResourceLoader.exists(ICON_CAR_COLLISION_ON):
+		_icon_car_collision_on = load(ICON_CAR_COLLISION_ON)
+
+	if ResourceLoader.exists(ICON_CAR_COLLISION_OFF):
+		_icon_car_collision_off = load(ICON_CAR_COLLISION_OFF)
+
+	if car_collision_button != null:
+		car_collision_button.focus_mode = Control.FOCUS_NONE
+		car_collision_button.expand_icon = true
+		# 交给 car_mode._input 统一判定，避免按钮自己吞掉拖动/重叠事件
+		car_collision_button.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	_apply_car_collision_icon()
+
 	_update_set_ground_icon()
 	_update_set_ground_visibility()
 	print("[CarMode][DBG] SetGround 初始化：按钮存在=", set_ground_button != null,
@@ -760,7 +788,8 @@ func _process(delta: float) -> void:
 		"z": q.z,
 		"w": q.w,
 		"forward": forward_distance,
-		"steer_scale": _steer_sensitivity_scale()
+		"steer_scale": _steer_sensitivity_scale(),
+		"car_collision": CAR_COLLISION
 	}
 
 	connection_node.call(
@@ -854,6 +883,48 @@ func _is_zoom_fit_hit(viewport_position: Vector2) -> bool:
 	return zoom_fit_button.get_global_rect().has_point(viewport_position)
 
 
+## 屏幕坐标是否落在 CarCollision 按钮上
+func _is_car_collision_hit(viewport_position: Vector2) -> bool:
+	if car_collision_button == null or not car_collision_button.visible:
+		return false
+
+	return car_collision_button.get_global_rect().has_point(viewport_position)
+
+
+## CarForwardArea 子节点在“新按下”时调用：
+##   按钮区域永远不接收前进触点；按钮按住期间，前进区暂时失效。
+func _is_car_forward_input_blocked(viewport_position: Vector2) -> bool:
+	if _car_collision_pointer != -1 or _car_collision_mouse:
+		return true
+
+	return _is_car_collision_hit(viewport_position)
+
+
+## 按 CAR_COLLISION 状态更新按钮图标
+func _apply_car_collision_icon() -> void:
+	if car_collision_button == null:
+		return
+
+	var tex: Texture2D = (
+		_icon_car_collision_on if CAR_COLLISION
+		else _icon_car_collision_off
+	)
+
+	if tex != null:
+		car_collision_button.icon = tex
+		car_collision_button.text = ""
+	else:
+		car_collision_button.text = "ON" if CAR_COLLISION else "OFF"
+
+
+## 切换车辆防撞；实际 2m 距离由 Blender car_action.py 按地面高度计算
+func _toggle_car_collision() -> void:
+	CAR_COLLISION = not CAR_COLLISION
+	_apply_car_collision_icon()
+
+	print("[CarMode] CAR_COLLISION = ", CAR_COLLISION)
+
+
 ## 触摸/鼠标输入：命中 ZoomFit 就切换（用矩形命中，不用 Button.pressed）
 func _input(event: InputEvent) -> void:
 	# 先维护"前进区域触点"集合（必须最先执行 ✓ 不能被别的分支挡住 ✗）
@@ -861,10 +932,31 @@ func _input(event: InputEvent) -> void:
 		var t := event as InputEventScreenTouch
 
 		if t.pressed:
-			if _is_in_forward_area(t.position):
+			# CarCollision 优先：按钮区域不参与前进区
+			if _is_car_collision_hit(t.position):
+				# 前进区正在用时，按钮不允许按下；鼠标占用时也不重复触发
+				if (
+					not _is_forward_pressed()
+					and _car_collision_pointer == -1
+					and not _car_collision_mouse
+				):
+					_toggle_car_collision()
+					_car_collision_pointer = t.index
+					get_viewport().set_input_as_handled()
+				return
+
+			# 按钮按住期间（触摸或鼠标），CarForwardArea 暂时失效
+			if (
+				_car_collision_pointer == -1
+				and not _car_collision_mouse
+				and _is_in_forward_area(t.position)
+			):
 				_forward_pointers[t.index] = true
 		else:
 			_forward_pointers.erase(t.index)
+
+			if t.index == _car_collision_pointer:
+				_car_collision_pointer = -1
 
 	if event is InputEventScreenTouch:
 		# SetGround：按下开始计时，抬起结束（手动命中检测，真机可靠 ✓）
@@ -922,6 +1014,22 @@ func _input(event: InputEvent) -> void:
 			return
 
 		if event.button_index != MOUSE_BUTTON_LEFT:
+			return
+
+		# CarCollision：鼠标按下/抬起（桌面测试用）
+		if event.pressed and _is_car_collision_hit(event.position):
+			if (
+				not _is_forward_pressed()
+				and not _car_collision_mouse
+				and _car_collision_pointer == -1
+			):
+				_toggle_car_collision()
+				_car_collision_mouse = true
+				get_viewport().set_input_as_handled()
+			return
+
+		if not event.pressed and _car_collision_mouse:
+			_car_collision_mouse = false
 			return
 
 		# 鼠标松开：结束 SetGround 长按

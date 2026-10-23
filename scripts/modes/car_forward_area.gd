@@ -186,6 +186,19 @@ func _input(event: InputEvent) -> void:
 	if not is_visible_in_tree():
 		return
 
+	# CarCollision 按钮优先：按钮区域/按钮按住时，不接收新的前进触点。
+	# 只拦“新按下”，已经在前进区里的手指拖动不受影响。
+	var car_parent := get_parent()
+
+	if car_parent != null and car_parent.has_method("_is_car_forward_input_blocked"):
+		if event is InputEventScreenTouch:
+			if event.pressed and bool(car_parent.call("_is_car_forward_input_blocked", event.position)):
+				return
+		elif event is InputEventMouseButton:
+			if event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+				if bool(car_parent.call("_is_car_forward_input_blocked", event.position)):
+					return
+
 	# 手机触屏：记录按下与松开。
 	if event is InputEventScreenTouch:
 		if event.pressed:
