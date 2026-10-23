@@ -186,8 +186,9 @@ func _input(event: InputEvent) -> void:
 	if not is_visible_in_tree():
 		return
 
-	# CarCollision 按钮优先：按钮区域/按钮按住时，不接收新的前进触点。
-	# 只拦“新按下”，已经在前进区里的手指拖动不受影响。
+	# CarCollision 按钮优先：只有触点落在按钮区域时，才不接收这个前进触点。
+	# 按钮按住期间，前进区其他位置仍然有效；只拦“新按下”，
+	# 已经在前进区里的手指拖动不受影响。
 	var car_parent := get_parent()
 
 	if car_parent != null and car_parent.has_method("_is_car_forward_input_blocked"):

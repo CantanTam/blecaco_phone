@@ -892,11 +892,9 @@ func _is_car_collision_hit(viewport_position: Vector2) -> bool:
 
 
 ## CarForwardArea 子节点在“新按下”时调用：
-##   按钮区域永远不接收前进触点；按钮按住期间，前进区暂时失效。
+##   只有触点落在 CarCollision 按钮上时才让按钮优先（重合区域）。
+##   按钮按住期间，前进区其他位置仍然有效 —— CarForwardArea 一直有效。
 func _is_car_forward_input_blocked(viewport_position: Vector2) -> bool:
-	if _car_collision_pointer != -1 or _car_collision_mouse:
-		return true
-
 	return _is_car_collision_hit(viewport_position)
 
 
@@ -945,12 +943,8 @@ func _input(event: InputEvent) -> void:
 					get_viewport().set_input_as_handled()
 				return
 
-			# 按钮按住期间（触摸或鼠标），CarForwardArea 暂时失效
-			if (
-				_car_collision_pointer == -1
-				and not _car_collision_mouse
-				and _is_in_forward_area(t.position)
-			):
+			# CarForwardArea 一直有效：按钮按住不影响其他触点的前进
+			if _is_in_forward_area(t.position):
 				_forward_pointers[t.index] = true
 		else:
 			_forward_pointers.erase(t.index)
