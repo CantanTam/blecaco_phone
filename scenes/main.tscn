@@ -131,6 +131,44 @@ script = ExtResource("2_jyhfs")
 [node name="Stream" parent="." unique_id=1261490250 instance=ExtResource("1_0wfyh")]
 layout_mode = 1
 
+[node name="CenterNotice" type="Panel" parent="." unique_id=913111601]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Vertical" type="ColorRect" parent="CenterNotice" unique_id=39178345]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -1.5
+offset_top = -20.0
+offset_right = 1.5
+offset_bottom = 20.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(1, 1, 1, 0.47058824)
+
+[node name="Horizontal" type="ColorRect" parent="CenterNotice" unique_id=901752767]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -20.0
+offset_top = -1.5
+offset_right = 20.0
+offset_bottom = 1.5
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(1, 1, 1, 0.47058824)
+
 [node name="ModeContainer" type="Control" parent="." unique_id=1559283247]
 layout_mode = 1
 anchors_preset = 15
@@ -217,9 +255,7 @@ layout_mode = 1
 anchors_preset = -1
 anchor_left = 0.5
 anchor_right = 0.5
-offset_left = 0.0
 offset_top = -200.0
-offset_right = 0.0
 offset_bottom = -10.0
 grow_horizontal = 2
 grow_vertical = 2
