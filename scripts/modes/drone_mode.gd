@@ -3,6 +3,10 @@ extends Control
 # 无人机状态：false = 关闭，true = 开启
 var DRONE_STATU: bool = false
 
+# DroneCollision 开关（与 game_mode 的 WALL_COLLISION 分开命名）
+#   默认开；每条 stick 消息把状态发给 Blender
+var DRONE_COLLISION: bool = true
+
 # 摇杆"触发"半径：手指落在这个圆内才开始拖动摇杆
 const STICK_TRIGGER_RADIUS: float = 100.0
 
@@ -99,6 +103,10 @@ var _rotation_sensitivity_icons: Array = [null, null, null]
 const ICON_LIMIT_OFF: String = "res://resources/UnLimitOrientation.svg"
 const ICON_LIMIT_ON: String = "res://resources/LimitOrientation.svg"
 
+# DroneCollision 开关图标（90px 专用版本，避免 120px 图标撑大 90px 按钮）
+const ICON_DRONE_COLLISION_ON: String = "res://resources/DroneCollision.svg"
+const ICON_DRONE_COLLISION_OFF: String = "res://resources/NoDroneCollision.svg"
+
 var _icon_limit_off: Texture2D = null
 var _icon_limit_on: Texture2D = null
 
@@ -123,6 +131,7 @@ const MOUSE_POINTER_ID: int = -2
 @onready var roll_left_button: Button = $RollLeft
 @onready var roll_right_button: Button = $RollRight
 @onready var rotation_sensitivity_button: Button = $RotationSensitivityButton
+@onready var drone_collision_button: Button = $DroneCollision
 
 # 左右摇杆按钮
 @onready var left_stick_button: Panel = $LeftStickArea/LeftStickButton
@@ -269,6 +278,12 @@ func _ready() -> void:
 
 	_update_rotation_sensitivity_icon()
 
+	# DroneCollision：90px 按钮 + 90px 专用图标
+	if drone_collision_button != null:
+		drone_collision_button.focus_mode = Control.FOCUS_NONE
+		drone_collision_button.expand_icon = true
+		_apply_drone_collision_icon()
+
 	# 初始化开关外观和节点可见状态
 	_update_toggle_visual(false)
 	_update_node_visibility()
@@ -304,6 +319,12 @@ func _input(event: InputEvent) -> void:
 			# 优先处理开关
 			if _is_position_inside(toggle_area, touch.position):
 				_toggle_drone_status()
+				get_viewport().set_input_as_handled()
+				return
+
+			# DroneCollision 开关（90px）
+			if _is_drone_collision_hit(touch.position):
+				_toggle_drone_collision()
 				get_viewport().set_input_as_handled()
 				return
 
@@ -409,6 +430,12 @@ func _input(event: InputEvent) -> void:
 				# 优先处理开关
 				if _is_position_inside(toggle_area, mouse.position):
 					_toggle_drone_status()
+					get_viewport().set_input_as_handled()
+					return
+
+				# DroneCollision 开关（90px）
+				if _is_drone_collision_hit(mouse.position):
+					_toggle_drone_collision()
 					get_viewport().set_input_as_handled()
 					return
 
@@ -907,6 +934,7 @@ func _send_stick_payload(left_vector: Vector2, right_vector: Vector2) -> void:
 			"speed_l": _move_scale() * float(SPEED_TIER_MULTIPLIERS[_left_speed_tier]),
 			"speed_r": _move_scale() * float(SPEED_TIER_MULTIPLIERS[_right_speed_tier]),
 			"dt": 1.0 / STICK_SEND_HZ,
+			"drone_collision": DRONE_COLLISION,
 		}
 	)
 
@@ -1319,6 +1347,37 @@ func _rotation_sensitivity_scale() -> float:
 	var tier: int = ROTATION_SENSITIVITY % ROTATION_SENSITIVITY_MULTIPLIERS.size()
 
 	return float(ROTATION_SENSITIVITY_MULTIPLIERS[tier])
+
+
+## 按 DRONE_COLLISION 更新 90px 图标
+func _apply_drone_collision_icon() -> void:
+	if drone_collision_button == null:
+		return
+
+	var path: String = (
+		ICON_DRONE_COLLISION_ON if DRONE_COLLISION else ICON_DRONE_COLLISION_OFF
+	)
+
+	if not ResourceLoader.exists(path):
+		print("[DroneMode] DroneCollision 图标缺失：", path)
+		return
+
+	drone_collision_button.icon = load(path)
+	drone_collision_button.expand_icon = true
+
+
+## DroneCollision 被点击：取反
+func _toggle_drone_collision() -> void:
+	DRONE_COLLISION = not DRONE_COLLISION
+	_apply_drone_collision_icon()
+	print("[DroneMode] DRONE_COLLISION = ", DRONE_COLLISION)
+
+
+## 屏幕坐标是否落在 DroneCollision 上
+func _is_drone_collision_hit(viewport_position: Vector2) -> bool:
+	if drone_collision_button == null or not drone_collision_button.is_visible_in_tree():
+		return false
+	return drone_collision_button.get_global_rect().has_point(viewport_position)
 
 
 # ============================================================

@@ -350,7 +350,7 @@ theme_override_styles/hover = SubResource("StyleBoxFlat_0mdr0")
 icon = ExtResource("6_1ha33")
 icon_alignment = 1
 
-[node name="DroneInformation" type="Button" parent="." unique_id=1507647843]
+[node name="DroneCollision" type="Button" parent="." unique_id=1507647843]
 layout_mode = 1
 offset_left = 100.0
 offset_top = 350.0
