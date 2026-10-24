@@ -376,11 +376,12 @@ func _input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 				return
 
-			# 其余触摸 → 记为倾斜手势的候选手指
+			# 其余触摸 → 倾斜候选；但任一摇杆未松开时 TiltArea 暂时失效
 			# （飞行时 TiltArea 是隐藏的，所以不限制具体区域；
 			#   摇杆/开关已在上面的分支被占用，不会冲突）
-			_tilt_pointers[touch.index] = touch.position
-			_tilt_prev.erase(touch.index)
+			if _is_tilt_allowed():
+				_tilt_pointers[touch.index] = touch.position
+				_tilt_prev.erase(touch.index)
 		else:
 			# 手指松开：先看是不是 Roll 按钮（点按 = 步进 / 长按结束 = 停止）
 			if _roll_pointers.has(touch.index):
@@ -533,6 +534,19 @@ func _set_button_offsets(
 	button.offset_bottom = base_offsets.w + movement.y
 
 
+## 左右摇杆任一未松开时，TiltArea 暂时失效；只有两者都松开才允许倾斜
+func _is_tilt_allowed() -> bool:
+	return left_stick_pointer_id == -1 and right_stick_pointer_id == -1
+
+
+## 清空倾斜手势状态（摇杆开始/保持时调用）
+func _cancel_tilt() -> void:
+	_tilt_pointers.clear()
+	_tilt_prev.clear()
+	_tilt_accum = 0.0
+	_tilt_send_timer = 0.0
+
+
 func _try_start_stick(
 	pointer_id: int,
 	viewport_position: Vector2
@@ -557,6 +571,8 @@ func _try_start_stick(
 			left_stick_touch_start = left_local
 			left_stick_latest_position = viewport_position
 
+			_cancel_tilt()
+
 			if DEBUG_INPUT:
 				print("[Drone] 左摇杆已捕获 (id=%d)" % pointer_id)
 
@@ -577,6 +593,8 @@ func _try_start_stick(
 			right_stick_pointer_id = pointer_id
 			right_stick_touch_start = right_local
 			right_stick_latest_position = viewport_position
+
+			_cancel_tilt()
 
 			if DEBUG_INPUT:
 				print("[Drone] 右摇杆已捕获 (id=%d)" % pointer_id)
@@ -978,6 +996,11 @@ func _update_tilt(delta: float) -> void:
 	if not DRONE_STATU:
 		_tilt_prev.clear()
 		_tilt_accum = 0.0
+		return
+
+	# 左右摇杆任一还按着 → TiltArea 暂时失效
+	if not _is_tilt_allowed():
+		_cancel_tilt()
 		return
 
 	if _tilt_pointers.size() < 2:
